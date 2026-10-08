@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body { @apply bg-fondo text-testo antialiased; }
+
+@layer components {
+  .carta { @apply rounded-xl bg-carta p-4; }
+  .etichetta { @apply mb-1 block text-xs uppercase tracking-wide text-tenue; }
+  .campo { @apply w-full rounded-lg border border-bordo bg-fondo px-3 py-2.5 text-base outline-none focus:border-accento; }
+  .bottone { @apply inline-flex items-center justify-center rounded-lg bg-accento px-4 py-2.5 font-semibold text-black disabled:opacity-50; }
+  .bottone-sec { @apply inline-flex items-center justify-center rounded-lg bg-bordo px-4 py-2.5 font-semibold text-testo; }
+  .pill { @apply inline-block rounded-full px-2 py-0.5 text-xs font-semibold; }
+  .link { @apply text-accento underline-offset-2 hover:underline; }
+}

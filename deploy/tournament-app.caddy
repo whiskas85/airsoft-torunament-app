@@ -1,0 +1,6 @@
+# Da copiare sul server in /opt/gestionale/siti/ (cartella dei siti del proxy del team-management).
+# Il proxy deve essere collegato alla rete ta-bordo: docker network connect ta-bordo zd-proxy
+tournament-app.zerodarkteam.it {
+	encode zstd gzip
+	reverse_proxy ta-app:3100
+}

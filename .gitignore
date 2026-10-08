@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+*.log
+next-env.d.ts
+/uploads/
+.claude/
+!.env.prod.example
+*.tsbuildinfo

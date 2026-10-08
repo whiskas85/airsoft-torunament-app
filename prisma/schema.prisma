@@ -1,0 +1,685 @@
+// Schema dell'app tornei. Il modello ragionato sta in docs/modello-dati.md.
+//
+// Due mondi separati:
+//   - CONFIGURAZIONE (enti, tipologie, template, eventi, obiettivi, tabella punteggi):
+//     si scrive online e all'avvio dell'evento si congela;
+//   - FATTI DI GARA (tabella Operazione): un registro che si aggiunge e non si modifica,
+//     scritto dai telefoni anche offline. Lo stato si ricava rileggendolo.
+
+generator client {
+  provider      = "prisma-client-js"
+  // "native" per lo sviluppo, musl per l'immagine Docker (node:alpine)
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── enti e persone ───────────────────────────
+
+model Ente {
+  id             String   @id @default(cuid())
+  nome           String
+  sigla          String   @unique
+  logoUrl        String?
+  /// come si chiama la tessera in questo ente (es. "Tessera FIGT"): l'app resta generica
+  etichettaTessera String @default("Tessera")
+  creatoIl       DateTime @default(now())
+
+  coordinamenti Coordinamento[]
+  tessere       Tessera[]
+  ruoli         RuoloEnte[]
+  qualifiche    QualificaArbitro[]
+  squadre       Squadra[]
+  tipologie     TipologiaGara[]
+  template      Template[]
+  documenti     Documento[]
+  campionati    Campionato[]
+  eventi        Evento[]
+}
+
+model Coordinamento {
+  id      String @id @default(cuid())
+  enteId  String
+  ente    Ente   @relation(fields: [enteId], references: [id])
+  nome    String
+
+  squadre    Squadra[]
+  qualifiche QualificaArbitro[]
+  eventi     EventoCoordinamento[]
+  campionati CampionatoCoordinamento[]
+
+  @@unique([enteId, nome])
+}
+
+/// Una persona esiste anche senza account (es. l'elenco dei tesserati di un ente).
+model Persona {
+  id          String    @id @default(cuid())
+  nome        String
+  cognome     String
+  nascita     DateTime?
+  telefono    String?
+  creataIl    DateTime  @default(now())
+
+  utente       Utente?
+  tessere      Tessera[]
+  qualifiche   QualificaArbitro[]
+  membro       MembroSquadra[]
+  partecipante PartecipanteEvento[]
+  arbitro      ArbitroEvento[]
+}
+
+model Tessera {
+  id        String    @id @default(cuid())
+  personaId String
+  persona   Persona   @relation(fields: [personaId], references: [id])
+  enteId    String
+  ente      Ente      @relation(fields: [enteId], references: [id])
+  numero    String
+  validaDal DateTime?
+  validaAl  DateTime?
+
+  @@unique([enteId, numero])
+}
+
+model Utente {
+  id           String   @id @default(cuid())
+  personaId    String   @unique
+  persona      Persona  @relation(fields: [personaId], references: [id])
+  email        String   @unique
+  passwordHash String
+  attivo       Boolean  @default(true)
+  creatoIl     DateTime @default(now())
+  ultimoAccesso DateTime?
+
+  dispositivi Dispositivo[]
+  ruoli       RuoloEnte[]
+  direzione   MembroDirezione[]
+}
+
+/// Ogni telefono ha la sua coppia di chiavi: la privata non lascia mai il telefono.
+model Dispositivo {
+  id              String    @id // generato dal telefono
+  utenteId        String
+  utente          Utente    @relation(fields: [utenteId], references: [id])
+  chiavePubblica  String    // ECDSA P-256, JWK in formato testo
+  nome            String?
+  versioneApp     String?
+  /// ultima differenza misurata fra orologio del telefono e server (ms)
+  scartoOrologioMs Int      @default(0)
+  registratoIl    DateTime  @default(now())
+  ultimoSync      DateTime?
+  revocato        Boolean   @default(false)
+
+  operazioni Operazione[]
+}
+
+enum TipoRuoloEnte {
+  AMMINISTRATORE   // configura l'ente: tipologie, template, campionati, eventi
+  RESP_ARBITRI     // designa e gestisce gli arbitri
+  SEGRETERIA       // iscrizioni e pagamenti
+}
+
+model RuoloEnte {
+  id              String        @id @default(cuid())
+  utenteId        String
+  utente          Utente        @relation(fields: [utenteId], references: [id])
+  enteId          String
+  ente            Ente          @relation(fields: [enteId], references: [id])
+  ruolo           TipoRuoloEnte
+  coordinamentoId String?
+
+  @@unique([utenteId, enteId, ruolo])
+}
+
+model QualificaArbitro {
+  id              String         @id @default(cuid())
+  personaId       String
+  persona         Persona        @relation(fields: [personaId], references: [id])
+  enteId          String
+  ente            Ente           @relation(fields: [enteId], references: [id])
+  /// livello configurabile per ente (FIGT: AUSILIARE, REGIONALE, NAZIONALE)
+  livello         String
+  dal             DateTime       @default(now())
+  al              DateTime?
+  coordinamentoId String?
+  coordinamento   Coordinamento? @relation(fields: [coordinamentoId], references: [id])
+}
+
+// ─────────────────────────── squadre ───────────────────────────
+
+model Squadra {
+  id              String         @id @default(cuid())
+  enteId          String
+  ente            Ente           @relation(fields: [enteId], references: [id])
+  coordinamentoId String?
+  coordinamento   Coordinamento? @relation(fields: [coordinamentoId], references: [id])
+  nome            String
+  sigla           String?
+  logoUrl         String?
+  /// serie di fasce identificative: { colori: ["giallo","blu"] }
+  fasce           Json?
+  creataIl        DateTime       @default(now())
+
+  membri      MembroSquadra[]
+  campionati  IscrizioneCampionato[]
+  eventi      SquadraEvento[]
+  prestiti    PartecipanteEvento[] @relation("PrestitoDa")
+
+  @@unique([enteId, nome])
+}
+
+model MembroSquadra {
+  id        String    @id @default(cuid())
+  squadraId String
+  squadra   Squadra   @relation(fields: [squadraId], references: [id])
+  personaId String
+  persona   Persona   @relation(fields: [personaId], references: [id])
+  dal       DateTime  @default(now())
+  al        DateTime?
+
+  @@unique([squadraId, personaId])
+}
+
+// ─────────────────── tipologie di gara, documenti, template ───────────────────
+
+/// Es. PLR, PCR: un pacchetto di regolamento, template, tipi di obiettivo e parametri.
+model TipologiaGara {
+  id       String  @id @default(cuid())
+  enteId   String
+  ente     Ente    @relation(fields: [enteId], references: [id])
+  codice   String
+  nome     String
+
+  versioni   VersioneTipologia[]
+  campionati Campionato[]
+
+  @@unique([enteId, codice])
+}
+
+enum StatoVersione {
+  BOZZA
+  PUBBLICATA
+  RITIRATA
+}
+
+model VersioneTipologia {
+  id          String        @id @default(cuid())
+  tipologiaId String
+  tipologia   TipologiaGara @relation(fields: [tipologiaId], references: [id])
+  numero      Int
+  stato       StatoVersione @default(BOZZA)
+  /// operatori min/max, finestra min/max, modalità finestre, sequenza, esfiltrazione…
+  parametri   Json
+  /// regole di punteggio predefinite, copiate nella tabella punteggi di ogni evento
+  regolePredefinite Json
+  hash        String?
+  pubblicataIl DateTime?
+
+  tipiObiettivo TipoObiettivo[]
+  documenti     VersioneTipologiaDocumento[]
+  template      VersioneTipologiaTemplate[]
+  eventi        Evento[]
+
+  @@unique([tipologiaId, numero])
+}
+
+enum TipoDocumento {
+  REGOLAMENTO
+  BOOK
+  MODULO
+  MAPPA
+  ALTRO
+}
+
+model Documento {
+  id        String        @id @default(cuid())
+  enteId    String
+  ente      Ente          @relation(fields: [enteId], references: [id])
+  titolo    String
+  tipo      TipoDocumento
+  file      String        // percorso nello storage
+  mime      String
+  byte      Int
+  /// SHA-256 del file: tutti i telefoni devono avere esattamente lo stesso
+  hash      String
+  caricatoIl DateTime     @default(now())
+
+  tipologie VersioneTipologiaDocumento[]
+  eventi    EventoDocumento[]
+}
+
+model VersioneTipologiaDocumento {
+  versioneId  String
+  versione    VersioneTipologia @relation(fields: [versioneId], references: [id])
+  documentoId String
+  documento   Documento         @relation(fields: [documentoId], references: [id])
+
+  @@id([versioneId, documentoId])
+}
+
+enum CompilatoDa {
+  ARBITRO
+  SQUADRA
+  DIREZIONE
+}
+
+model TipoObiettivo {
+  id               String            @id @default(cuid())
+  versioneId       String
+  versione         VersioneTipologia @relation(fields: [versioneId], references: [id])
+  codice           String            // A, B, C…
+  nome             String
+  descrizione      String?
+  richiedeArbitro  Boolean           @default(true)
+  richiedeFinestra Boolean           @default(true)
+  compilatoDa      CompilatoDa       @default(ARBITRO)
+  fotoMinime       Int               @default(0)
+  /// con quali tipi si può abbinare nella stessa area (es. A con E)
+  abbinabileCon    String[]
+  templateId       String?
+
+  @@unique([versioneId, codice])
+}
+
+enum GenereTemplate {
+  OBIETTIVO
+  CONTRO
+  ESFILTRAZIONE
+  RECON
+  CONTROLLO
+  REGISTRAZIONE
+  TEST_ASG
+}
+
+model Template {
+  id      String         @id @default(cuid())
+  enteId  String
+  ente    Ente           @relation(fields: [enteId], references: [id])
+  codice  String
+  nome    String
+  genere  GenereTemplate
+
+  versioni VersioneTemplate[]
+
+  @@unique([enteId, codice])
+}
+
+model VersioneTemplate {
+  id           String            @id @default(cuid())
+  templateId   String
+  template     Template          @relation(fields: [templateId], references: [id])
+  numero       Int
+  stato        StatoVersione     @default(BOZZA)
+  /// definizione dei campi (vedi src/lib/template.ts)
+  campi        Json
+  /// variante: versione da cui deriva e valori già impostati (es. "scontro perso")
+  derivataDaId String?
+  derivataDa   VersioneTemplate? @relation("Derivazione", fields: [derivataDaId], references: [id])
+  derivate     VersioneTemplate[] @relation("Derivazione")
+  preimpostati Json?
+  hash         String?
+
+  tipologie VersioneTipologiaTemplate[]
+  obiettivi Obiettivo[]
+
+  @@unique([templateId, numero])
+}
+
+model VersioneTipologiaTemplate {
+  versioneTipologiaId String
+  versioneTipologia   VersioneTipologia @relation(fields: [versioneTipologiaId], references: [id])
+  versioneTemplateId  String
+  versioneTemplate    VersioneTemplate  @relation(fields: [versioneTemplateId], references: [id])
+
+  @@id([versioneTipologiaId, versioneTemplateId])
+}
+
+// ─────────────────────────── campionati ───────────────────────────
+
+model Campionato {
+  id          String        @id @default(cuid())
+  enteId      String
+  ente        Ente          @relation(fields: [enteId], references: [id])
+  tipologiaId String
+  tipologia   TipologiaGara @relation(fields: [tipologiaId], references: [id])
+  nome        String
+  stagione    String
+  /// punti per posizione, pari merito, migliori N, organizzatrici/aiuto, spareggi, tappe minime
+  regole      Json
+
+  coordinamenti CampionatoCoordinamento[]
+  iscrizioni    IscrizioneCampionato[]
+  eventi        EventoCampionato[]
+}
+
+model CampionatoCoordinamento {
+  campionatoId    String
+  campionato      Campionato    @relation(fields: [campionatoId], references: [id])
+  coordinamentoId String
+  coordinamento   Coordinamento @relation(fields: [coordinamentoId], references: [id])
+
+  @@id([campionatoId, coordinamentoId])
+}
+
+model IscrizioneCampionato {
+  campionatoId String
+  campionato   Campionato @relation(fields: [campionatoId], references: [id])
+  squadraId    String
+  squadra      Squadra    @relation(fields: [squadraId], references: [id])
+  dal          DateTime   @default(now())
+
+  @@id([campionatoId, squadraId])
+}
+
+// ─────────────────────────── evento ───────────────────────────
+
+enum StatoEvento {
+  BOZZA
+  PUBBLICATO
+  IN_CORSO
+  DEBRIEFING
+  TERMINATO   // classifica provvisoria, periodo contestazioni
+  UFFICIALE
+  ANNULLATO
+}
+
+model Evento {
+  id         String      @id @default(uuid()) // identificativo univoco (P11)
+  /// codice breve leggibile, stampato nei QR e nelle schermate
+  codice     String      @unique
+  enteId     String
+  ente       Ente        @relation(fields: [enteId], references: [id])
+  nome       String
+  locandinaUrl String?
+  inizio     DateTime
+  fine       DateTime
+  luogo      String?
+  lat        Float?
+  lon        Float?
+  versioneTipologiaId String
+  versioneTipologia   VersioneTipologia @relation(fields: [versioneTipologiaId], references: [id])
+  stato      StatoEvento @default(BOZZA)
+  /// visibilità punti in gara, modalità finestre, durata periodo contestazioni…
+  opzioni    Json
+  /// configurazione congelata all'avvio e suo codice di controllo
+  configurazioneCongelata Json?
+  hashConfigurazione      String?
+  avviatoIl  DateTime?
+  creatoIl   DateTime    @default(now())
+
+  coordinamenti EventoCoordinamento[]
+  campionati    EventoCampionato[]
+  documenti     EventoDocumento[]
+  obiettivi     Obiettivo[]
+  tabella       TabellaPunteggi?
+  squadre       SquadraEvento[]
+  arbitri       ArbitroEvento[]
+  direzione     MembroDirezione[]
+  operazioni    Operazione[]
+  foto          Foto[]
+  classifiche   ClassificaEvento[]
+}
+
+model EventoCoordinamento {
+  eventoId        String
+  evento          Evento        @relation(fields: [eventoId], references: [id])
+  coordinamentoId String
+  coordinamento   Coordinamento @relation(fields: [coordinamentoId], references: [id])
+
+  @@id([eventoId, coordinamentoId])
+}
+
+model EventoCampionato {
+  eventoId     String
+  evento       Evento     @relation(fields: [eventoId], references: [id])
+  campionatoId String
+  campionato   Campionato @relation(fields: [campionatoId], references: [id])
+  tappa        Int?
+
+  @@id([eventoId, campionatoId])
+}
+
+model EventoDocumento {
+  eventoId    String
+  evento      Evento        @relation(fields: [eventoId], references: [id])
+  documentoId String
+  documento   Documento     @relation(fields: [documentoId], references: [id])
+  ruolo       TipoDocumento
+
+  @@id([eventoId, documentoId])
+}
+
+enum StatoObiettivo {
+  ATTIVO
+  SOSPESO   // protocollo di sospensione: lo vedono solo arbitri e direzione
+  CHIUSO
+}
+
+model Obiettivo {
+  id          String   @id @default(cuid())
+  eventoId    String
+  evento      Evento   @relation(fields: [eventoId], references: [id])
+  codice      String   // OBJ1…
+  nome        String
+  /// tipi FIGT abbinati, es. ["A","E"]
+  tipi        String[]
+  lat         Float?
+  lon         Float?
+  /// raggi, porte IN/OUT, percorso: { areaEsecuzioneM, zonaObiettivoM, portaIn: {lat,lon}, portaOut: … }
+  geometria   Json?
+  durataMin   Int      // durata della finestra
+  areaDa      DateTime?
+  areaA       DateTime?
+  ultimaFinestra DateTime?
+  /// ordine nel percorso (PCR)
+  ordine      Int?
+  /// fasi E: [{ codice: "E1", nome: "Disinnesca la bomba" }]
+  fasi        Json     @default("[]")
+  versioneTemplateId String?
+  versioneTemplate   VersioneTemplate? @relation(fields: [versioneTemplateId], references: [id])
+  stato       StatoObiettivo @default(ATTIVO)
+
+  arbitri ArbitroObiettivo[]
+
+  @@unique([eventoId, codice])
+}
+
+/// Solo server e direzione: non arriva mai sui telefoni di arbitri e squadre.
+model TabellaPunteggi {
+  id        String   @id @default(cuid())
+  eventoId  String   @unique
+  evento    Evento   @relation(fields: [eventoId], references: [id])
+  regole    Json
+  versione  Int      @default(1)
+  aggiornataIl DateTime @updatedAt
+}
+
+// ─────────────────────────── partecipanti ───────────────────────────
+
+enum StatoSquadraEvento {
+  ISCRITTA
+  IN_GARA
+  ESFILTRATA
+  IN_DEBRIEFING
+  TERMINATA
+  SQUALIFICATA
+  NON_CLASSIFICATA
+}
+
+enum RuoloSquadraEvento {
+  GAREGGIA
+  ORGANIZZATRICE
+  AIUTO
+}
+
+model SquadraEvento {
+  id             String             @id @default(cuid())
+  eventoId       String
+  evento         Evento             @relation(fields: [eventoId], references: [id])
+  squadraId      String
+  squadra        Squadra            @relation(fields: [squadraId], references: [id])
+  /// identificativo pattuglia in gara (es. "ZD")
+  identificativo String
+  stato          StatoSquadraEvento @default(ISCRITTA)
+  ruolo          RuoloSquadraEvento @default(GAREGGIA)
+  /// false = squadra open (non in campionato) per questo evento
+  inCampionato   Boolean            @default(true)
+  pagato         Boolean            @default(false)
+  iscrittaIl     DateTime           @default(now())
+
+  partecipanti PartecipanteEvento[]
+
+  @@unique([eventoId, squadraId])
+  @@unique([eventoId, identificativo])
+}
+
+enum RuoloPartecipante {
+  CAPO_PATTUGLIA
+  VICE
+  OPERATORE
+}
+
+model PartecipanteEvento {
+  id              String            @id @default(cuid())
+  squadraEventoId String
+  squadraEvento   SquadraEvento     @relation(fields: [squadraEventoId], references: [id])
+  personaId       String
+  persona         Persona           @relation(fields: [personaId], references: [id])
+  ruolo           RuoloPartecipante @default(OPERATORE)
+  numeroFascia    Int?
+  prestitoDaId    String?
+  prestitoDa      Squadra?          @relation("PrestitoDa", fields: [prestitoDaId], references: [id])
+
+  testAsg TestAsg[]
+
+  @@unique([squadraEventoId, personaId])
+}
+
+enum StatoDesignazione {
+  PROPOSTA
+  ACCETTATA
+  RIFIUTATA
+}
+
+model ArbitroEvento {
+  id         String            @id @default(cuid())
+  eventoId   String
+  evento     Evento            @relation(fields: [eventoId], references: [id])
+  personaId  String
+  persona    Persona           @relation(fields: [personaId], references: [id])
+  /// CAPO_ARBITRO, OBIETTIVO, CONTRO, ESFILTRAZIONE, COMMISSIONE
+  ruoli      String[]
+  stato      StatoDesignazione @default(PROPOSTA)
+  motivoRifiuto String?
+  rispostaIl DateTime?
+
+  obiettivi ArbitroObiettivo[]
+
+  @@unique([eventoId, personaId])
+}
+
+model ArbitroObiettivo {
+  arbitroEventoId String
+  arbitroEvento   ArbitroEvento @relation(fields: [arbitroEventoId], references: [id])
+  obiettivoId     String
+  obiettivo       Obiettivo     @relation(fields: [obiettivoId], references: [id])
+
+  @@id([arbitroEventoId, obiettivoId])
+}
+
+model MembroDirezione {
+  id       String @id @default(cuid())
+  eventoId String
+  evento   Evento @relation(fields: [eventoId], references: [id])
+  utenteId String
+  utente   Utente @relation(fields: [utenteId], references: [id])
+  /// DIREZIONE, COMMISSIONE, ORGANIZZAZIONE
+  ruolo    String
+
+  @@unique([eventoId, utenteId, ruolo])
+}
+
+model TestAsg {
+  id              String             @id @default(cuid())
+  partecipanteId  String
+  partecipante    PartecipanteEvento @relation(fields: [partecipanteId], references: [id])
+  modelloAsg      String
+  velocitaMs      Float?
+  pesoPallinoG    Float?
+  joule           Float?
+  strumento       String?            // es. "Acetech AC6000 BT" o "manuale"
+  /// REGOLARE, ATTENZIONE (doppio marcatore), OVER_JOULE
+  esito           String
+  marcatore       String?
+  trattenuta      Boolean            @default(false)
+  ritestareAllaFine Boolean          @default(false)
+  misuratoIl      DateTime           @default(now())
+}
+
+// ─────────────────────── fatti di gara: il registro ───────────────────────
+
+/// Un fatto di gara. Creato sul telefono (anche offline), firmato, mai modificato.
+model Operazione {
+  /// generato dal telefono: un invio ripetuto non crea doppioni
+  id              String      @id
+  eventoId        String
+  evento          Evento      @relation(fields: [eventoId], references: [id])
+  /// es. finestra.assegnata, scheda.firmata_squadra… (elenco in src/lib/operazioni.ts)
+  tipo            String
+  autoreUtenteId  String
+  dispositivoId   String
+  dispositivo     Dispositivo @relation(fields: [dispositivoId], references: [id])
+  oraDispositivo  DateTime
+  scartoOrologioMs Int
+  /// ora del telefono corretta con lo scarto: è quella che conta in gara (P6bis, P7)
+  oraUfficiale    DateTime
+  /// { lat, lon, precisioneM } oppure null = GPS non disponibile (P8)
+  gps             Json?
+  /// operazioni a cui si riferisce (es. la scheda che si firma)
+  rif             String[]
+  dati            Json
+  /// firma ECDSA P-256 del contenuto canonico
+  firma           String
+  firmaValida     Boolean     @default(false)
+  /// quando è arrivata al server (P6bis)
+  ricevutaIl      DateTime    @default(now())
+  /// chi l'ha consegnata al server, se diverso dall'autore (passata via QR)
+  consegnataDa    String?
+
+  @@index([eventoId, tipo])
+  @@index([eventoId, oraUfficiale])
+  @@index([eventoId, ricevutaIl])
+}
+
+/// Le foto non viaggiano nei QR: l'operazione ne contiene il codice, il file arriva con la rete.
+model Foto {
+  /// SHA-256 del file
+  hash      String   @id
+  eventoId  String
+  evento    Evento   @relation(fields: [eventoId], references: [id])
+  file      String?
+  mime      String?
+  byte      Int?
+  caricataIl DateTime?
+}
+
+// ─────────────────────────── dati calcolati ───────────────────────────
+
+enum TipoClassifica {
+  PROVVISORIA
+  UFFICIALE
+}
+
+model ClassificaEvento {
+  id        String         @id @default(cuid())
+  eventoId  String
+  evento    Evento         @relation(fields: [eventoId], references: [id])
+  tipo      TipoClassifica
+  /// null = classifica generale, altrimenti quella del campionato
+  campionatoId String?
+  dati      Json
+  creataIl  DateTime       @default(now())
+}

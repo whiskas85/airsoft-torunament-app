@@ -1,0 +1,22 @@
+# Sviluppo in locale: solo il database. L'app gira con `npm run dev`.
+#   docker compose up -d db
+# Produzione: docker-compose.prod.yml (vedi deploy/DEPLOY.md)
+name: tournament-app-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ta-dev-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: torneo
+      POSTGRES_PASSWORD: torneo
+      POSTGRES_DB: torneo
+      TZ: Europe/Rome
+    ports:
+      - "5442:5432"   # 5442 per non scontrarsi con altri Postgres sul PC
+    volumes:
+      - db-dati:/var/lib/postgresql/data
+
+volumes:
+  db-dati:

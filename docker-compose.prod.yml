@@ -1,0 +1,58 @@
+# Produzione, sulla macchina del team-management, in container suoi.
+#
+#   docker compose -p tournament-app -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Il proxy Caddy del team-management (zd-proxy) raggiunge l'app sulla rete «ta-bordo»,
+# dove stanno solo il proxy e l'app: il database non è raggiungibile da fuori, e nessun
+# altro container della macchina vede quelli dell'app tornei. Dettagli in deploy/DEPLOY.md.
+name: tournament-app
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ta-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?serve l'utente del database}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?serve la password del database}
+      POSTGRES_DB: ${POSTGRES_DB:-torneo}
+      TZ: Europe/Rome
+    volumes:
+      - db-dati:/var/lib/postgresql/data
+    networks: [interna]
+    # la macchina ha 4 GB condivisi con i gestionali: tetti bassi, da rivedere dopo le misure
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      retries: 5
+
+  app:
+    build: .
+    image: tournament-app:${VERSIONE:-latest}
+    container_name: ta-app
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-torneo}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:?serve una chiave di sessione}
+      INDIRIZZO_PUBBLICO: https://${DOMINIO:-tournament-app.zerodarkteam.it}
+      COOKIE_SECURE: "1"
+      SEED_DEMO: ${SEED_DEMO:-0}
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
+      TZ: Europe/Rome
+    volumes:
+      - caricamenti:/app/uploads
+    networks: [interna, bordo]
+    mem_limit: 512m
+
+networks:
+  interna: {}
+  # rete condivisa col proxy: lo script di rilascio ci collega zd-proxy
+  bordo:
+    name: ta-bordo
+
+volumes:
+  db-dati:
+  caricamenti:
