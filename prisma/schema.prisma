@@ -407,6 +407,9 @@ model Evento {
   /// configurazione congelata all'avvio e suo codice di controllo
   configurazioneCongelata Json?
   hashConfigurazione      String?
+  /// codice di controllo della tabella punteggi al momento dell'avvio: da lì non cambia più
+  hashTabella             String?
+  pubblicatoIl DateTime?
   avviatoIl  DateTime?
   creatoIl   DateTime    @default(now())
 
@@ -573,6 +576,7 @@ model ArbitroEvento {
   /// CAPO_ARBITRO, OBIETTIVO, CONTRO, ESFILTRAZIONE, COMMISSIONE
   ruoli      String[]
   stato      StatoDesignazione @default(PROPOSTA)
+  propostoIl DateTime          @default(now())
   motivoRifiuto String?
   rispostaIl DateTime?
 

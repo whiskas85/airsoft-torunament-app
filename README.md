@@ -53,4 +53,10 @@ Per ripartire da zero: `npx prisma migrate reset` (azzera il database e riesegue
 regole di campionato), login, home per ruolo, consultazione di configurazione ed eventi, anteprima dei template
 generata dai dati, immagine Docker e compose di produzione.
 
-Prossima tappa: **M2 — Evento e iscrizioni** (vedi [piano](docs/piano-demo.md)).
+**M2 — Evento e iscrizioni**: creazione dell'evento da una tipologia; obiettivi con fasi e tabella punteggi, controllati
+con i limiti della tipologia (abbinamenti, durata finestra, area temporale, ordine PCR); iscrizione delle squadre
+(dal membro o dalla direzione) con presenze, ruoli, fasce e prestiti; designazione degli arbitri con accetta/rifiuta,
+blocco degli impegni sovrapposti e avviso di conflitto di interessi; regolamento e book con codice di controllo;
+pubblicazione e **avvio con congelamento** (fotografia della configurazione senza tabella punteggi).
+
+Prossima tappa: **M3 — Motore offline** (vedi [piano](docs/piano-demo.md)).

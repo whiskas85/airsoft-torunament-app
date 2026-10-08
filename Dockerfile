@@ -32,7 +32,7 @@ COPY --from=build --chown=app:app /app/node_modules/.prisma ./node_modules/.pris
 COPY --from=build --chown=app:app /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY --chown=app:app docker-entrypoint.sh ./
 # se il file arriva da Windows con gli a capo CRLF, la shell non lo esegue
-RUN sed -i 's/\r$//' docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh && mkdir -p /app/uploads && chown app:app /app/uploads
 USER app
 EXPOSE 3100
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s CMD wget -qO- http://127.0.0.1:3100/api/salute || exit 1

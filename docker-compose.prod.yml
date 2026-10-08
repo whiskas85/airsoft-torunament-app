@@ -16,7 +16,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?serve l'utente del database}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?serve la password del database}
       POSTGRES_DB: ${POSTGRES_DB:-torneo}
-      TZ: Europe/Rome
+      # il database lavora in UTC: le date si convertono in ora italiana solo quando si mostrano
     volumes:
       - db-dati:/var/lib/postgresql/data
     networks: [interna]
@@ -41,6 +41,7 @@ services:
       COOKIE_SECURE: "1"
       DEBUG_LOGIN: "0"   # i pulsanti di accesso rapido non esistono in produzione
       SEED_DEMO: ${SEED_DEMO:-0}
+      UPLOAD_DIR: /app/uploads
       SEED_PASSWORD: ${SEED_PASSWORD:-}
       TZ: Europe/Rome
     volumes:

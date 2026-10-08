@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: torneo
       POSTGRES_PASSWORD: torneo
       POSTGRES_DB: torneo
-      TZ: Europe/Rome
+      # il database lavora in UTC: le date si convertono in ora italiana solo quando si mostrano
     ports:
       - "5442:5432"   # 5442 per non scontrarsi con altri Postgres sul PC
     volumes:
