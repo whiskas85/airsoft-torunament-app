@@ -629,6 +629,8 @@ model TestAsg {
 model Operazione {
   /// generato dal telefono: un invio ripetuto non crea doppioni
   id              String      @id
+  /// ordine di arrivo al server: è il "segnalibro" con cui i telefoni chiedono solo le novità
+  seq             BigInt      @unique @default(autoincrement())
   eventoId        String
   evento          Evento      @relation(fields: [eventoId], references: [id])
   /// es. finestra.assegnata, scheda.firmata_squadra… (elenco in src/lib/operazioni.ts)
@@ -642,6 +644,9 @@ model Operazione {
   oraUfficiale    DateTime
   /// { lat, lon, precisioneM } oppure null = GPS non disponibile (P8)
   gps             Json?
+  /// per chi riceve l'operazione in sincronizzazione: la squadra e l'obiettivo a cui si riferisce
+  squadraEventoId String?
+  obiettivoId     String?
   /// operazioni a cui si riferisce (es. la scheda che si firma)
   rif             String[]
   dati            Json
@@ -655,7 +660,7 @@ model Operazione {
 
   @@index([eventoId, tipo])
   @@index([eventoId, oraUfficiale])
-  @@index([eventoId, ricevutaIl])
+  @@index([eventoId, seq])
 }
 
 /// Le foto non viaggiano nei QR: l'operazione ne contiene il codice, il file arriva con la rete.

@@ -40,6 +40,14 @@ export default async function Home() {
           <p className="text-sm text-tenue">I tuoi eventi e il tuo ruolo in ciascuno.</p>
         </section>
 
+        <section className="carta flex flex-wrap items-center gap-3 ring-1 ring-accento">
+          <div className="mr-auto">
+            <div className="font-semibold">App di campo</div>
+            <div className="text-sm text-tenue">Per arbitri e squadre: funziona anche senza rete. Aprila una volta con la rete e installala nella schermata Home.</div>
+          </div>
+          <Link href="/campo" className="bottone">Apri l’app di campo</Link>
+        </section>
+
         {designazioni.map((d) => (
           <section key={d.id} className="carta space-y-2 ring-1 ring-avviso">
             <div className="font-semibold">Designazione arbitrale: {d.evento.nome}</div>

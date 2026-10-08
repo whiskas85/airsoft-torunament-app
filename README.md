@@ -59,4 +59,11 @@ con i limiti della tipologia (abbinamenti, durata finestra, area temporale, ordi
 blocco degli impegni sovrapposti e avviso di conflitto di interessi; regolamento e book con codice di controllo;
 pubblicazione e **avvio con congelamento** (fotografia della configurazione senza tabella punteggi).
 
-Prossima tappa: **M3 — Motore offline** (vedi [piano](docs/piano-demo.md)).
+**M3 — Motore offline**: app di campo `/campo` installabile, che si riapre anche a server spento (service worker);
+ogni telefono ha la sua coppia di chiavi ECDSA P-256 (la privata non è esportabile); pacchetto dell'evento con la
+configurazione congelata filtrata per ruolo, le chiavi pubbliche dei partecipanti e i documenti verificati con SHA-256;
+registro delle operazioni firmate con ora ufficiale (scarto dal server) e GPS; sincronizzazione idempotente in invio
+e ricezione con segnalibro; scambio delle operazioni via QR con verifica delle firme anche offline e consegna per conto
+di altri. Collaudo automatico: `node scripts/prova-sync.mjs` (con il server di sviluppo acceso).
+
+Prossima tappa: **M4 — Arbitro e squadra** (vedi [piano](docs/piano-demo.md)).
