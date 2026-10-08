@@ -39,6 +39,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?serve una chiave di sessione}
       INDIRIZZO_PUBBLICO: https://${DOMINIO:-tournament-app.zerodarkteam.it}
       COOKIE_SECURE: "1"
+      DEBUG_LOGIN: "0"   # i pulsanti di accesso rapido non esistono in produzione
       SEED_DEMO: ${SEED_DEMO:-0}
       SEED_PASSWORD: ${SEED_PASSWORD:-}
       TZ: Europe/Rome

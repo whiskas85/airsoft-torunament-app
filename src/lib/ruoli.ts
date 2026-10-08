@@ -14,13 +14,23 @@ export async function mieiEventi(u: UtenteCorrente) {
         { direzione: { some: { utenteId: u.id } } },
         { arbitri: { some: { personaId: u.personaId } } },
         { squadre: { some: { partecipanti: { some: { personaId: u.personaId } } } } },
+        // anche chi è membro di una squadra iscritta senza giocare (es. organizzatrice)
+        { squadre: { some: { squadra: { membri: { some: { personaId: u.personaId, al: null } } } } } },
       ],
     },
     include: {
       versioneTipologia: { include: { tipologia: true } },
       direzione: { where: { utenteId: u.id } },
       arbitri: { where: { personaId: u.personaId } },
-      squadre: { where: { partecipanti: { some: { personaId: u.personaId } } }, include: { squadra: true } },
+      squadre: {
+        where: {
+          OR: [
+            { partecipanti: { some: { personaId: u.personaId } } },
+            { squadra: { membri: { some: { personaId: u.personaId, al: null } } } },
+          ],
+        },
+        include: { squadra: true },
+      },
       _count: { select: { obiettivi: true, squadre: true } },
     },
     orderBy: { inizio: 'asc' },

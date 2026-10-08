@@ -33,6 +33,9 @@ npm run db:seed                  # configurazione FIGT d'esempio, squadre ed eve
 npm run dev                      # http://localhost:3100
 ```
 
+Con `DEBUG_LOGIN=1` (già impostato in `.env.example`) la pagina di accesso mostra un **pulsante per ogni account
+di prova**: si entra con un clic, senza password. In produzione è forzato a `0` nel compose e i pulsanti non esistono.
+
 Account di prova (password = `SEED_PASSWORD` in `.env`):
 
 | Account | Ruolo |
