@@ -11,35 +11,35 @@ internet ──443──▶ zd-proxy (Caddy, del team-management)
                   ta-app :3100 ──rete interna──▶ ta-db :5432 (nessuna porta pubblicata)
 ```
 
-## Una volta sola
+## Rilascio da GitHub (come il team-management)
 
-1. **DNS**: record `A` di `tournament-app.zerodarkteam.it` verso l'indirizzo pubblico della macchina.
-   Va fatto *prima* di accendere il sito: Caddy chiede subito il certificato.
-2. **Codice** sulla macchina:
-   ```bash
-   git clone https://github.com/whiskas85/airsoft-torunament-app.git /opt/tournament-app
-   cd /opt/tournament-app
-   cp .env.prod.example .env.prod && chmod 600 .env.prod   # e compilarlo
-   ```
-3. **Avvio**:
-   ```bash
-   docker compose -p tournament-app -f docker-compose.prod.yml --env-file .env.prod up -d --build
-   docker network connect ta-bordo zd-proxy
-   ```
-4. **Sito nel proxy**: copiare `deploy/tournament-app.caddy` in `/opt/gestionale/siti/` e riavviare il proxy
-   (il Caddyfile è montato come file: un reload rilegge quello vecchio).
-   ```bash
-   cp deploy/tournament-app.caddy /opt/gestionale/siti/
-   docker restart zd-proxy
-   ```
-5. Controllo: `curl https://tournament-app.zerodarkteam.it/api/salute` → `{"ok":true}`.
+**Actions → Rilascio → Run workflow**, dal ramo `main`:
 
-## Aggiornamenti
+- `prova`: si collega al server e guarda soltanto (codice, container, rete del proxy, DNS, memoria).
+- `rilascio`: costruisce l'immagine su GitHub e la pubblica in `ghcr.io/whiskas85/tournament-app:<commit>`,
+  poi sul server lancia `deploy/server.sh rilascia`:
+  - **la prima volta** clona in `/opt/tournament-app` e crea `.env.prod` con chiavi nuove (password del
+    database e chiave di sessione generate sul server, mai nel log) e i dati demo;
+  - poi: backup del database in `/opt/tournament-app/backup` (gli ultimi dieci), immagine nuova,
+    **ritorno all'immagine precedente** se l'app non risponde;
+  - sempre: `zd-proxy` collegato alla rete `ta-bordo` e `deploy/tournament-app.caddy` copiato in
+    `/opt/gestionale/siti/` con reload del proxy, **solo se il DNS punta già alla macchina**.
+
+### Da fare una volta sola
+
+1. **DNS**: record `A` di `tournament-app.zerodarkteam.it` verso lo stesso indirizzo di `ops.zerodarkteam.it`.
+2. **Secret del repository** (Settings → Secrets and variables → Actions), gli stessi del team-management:
+   `SERVER_USER`, `SERVER_SSH_KEY`. Facoltativo `SEED_PASSWORD`: la password degli account demo
+   (se manca, ne viene generata una e resta in `/opt/tournament-app/.env.prod`).
+3. Lanciare `rilascio`. Controllo: `https://tournament-app.zerodarkteam.it/api/salute` → `{"ok":true}`.
+
+Se il DNS arriva dopo il primo rilascio, basta rilanciarlo: accende il sito nel proxy.
+
+## A mano, sul server
 
 ```bash
-cd /opt/tournament-app && git pull
-docker compose -p tournament-app -f docker-compose.prod.yml --env-file .env.prod up -d --build
-docker network connect ta-bordo zd-proxy 2>/dev/null || true   # se il proxy è stato ricreato
+cd /opt/tournament-app && bash deploy/server.sh stato
+RAMO=main bash deploy/server.sh rilascia      # senza REGISTRO costruisce l'immagine sul server
 ```
 
 All'avvio il container applica solo le migrazioni mancanti (`prisma migrate deploy`): un riavvio non cancella dati.
