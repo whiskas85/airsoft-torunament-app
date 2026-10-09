@@ -1,0 +1,139 @@
+# Il rilascio in produzione (https://tournament-app.zerodarkteam.it), lanciato a
+# mano da GitHub (Actions → Rilascio → Run workflow). Non parte mai da solo.
+# Come quello del team-management, sulla stessa macchina.
+#
+# I modi:
+#   prova      si collega al server e guarda soltanto (deploy/server.sh stato).
+#   rilascio   l'immagine costruita qui su GitHub e pubblicata nel registro
+#              (ghcr.io/whiskas85/tournament-app:<commit>), poi sul server
+#              deploy/server.sh rilascia: la prima volta clona e crea
+#              .env.prod con chiavi nuove; poi backup, immagine nuova, ritorno
+#              indietro se non risponde, proxy e sito.
+#
+# Le credenziali stanno nei secret del repository, mai qui: il repository e'
+# pubblico. Sono le stesse del team-management.
+#   SERVER_USER          l'utente con cui si entra
+#   SERVER_SSH_KEY       la chiave privata per i rilasci
+#   SEED_PASSWORD        (facoltativo) password degli account demo, usata solo
+#                        alla prima installazione
+#
+# Nome e impronta del server sono pubblici: vedi il rilascio del team-management.
+
+name: Rilascio
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'prova = guarda soltanto · rilascio = produzione'
+        type: choice
+        options: [prova, rilascio]
+        default: prova
+
+# mai due lavori insieme sulla stessa macchina
+concurrency:
+  group: rilascio-tournament-app
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  HOST: ops.zerodarkteam.it
+  IMPRONTA: ops.zerodarkteam.it ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOHXXfS9NeIXEadQBZip3Dc6mPcRLPxRSzmj8HVVpbrt
+
+jobs:
+  # l'immagine si costruisce qui: sul server la build mangerebbe un giga di
+  # memoria condivisa con i gestionali
+  pubblica:
+    if: inputs.modo == 'rilascio'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Immagine dell'app tornei
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/tournament-app:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/tournament-app:latest
+
+  server:
+    needs: pubblica
+    # se «pubblica» fallisce si va avanti lo stesso: il server costruisce da se'
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Chiave e impronta del server
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          if [ -z "$SSH_KEY" ]; then
+            echo "::error::Manca il secret SERVER_SSH_KEY (Settings → Secrets and variables → Actions)"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/rilascio
+          chmod 600 ~/.ssh/rilascio
+          printf '%s\n' "$IMPRONTA" > ~/.ssh/known_hosts
+          if ! ssh-keygen -y -f ~/.ssh/rilascio > /dev/null 2>&1; then
+            echo "::error::SERVER_SSH_KEY non e' una chiave privata leggibile, o ha una passphrase"
+            exit 1
+          fi
+          echo "SSH=ssh -i $HOME/.ssh/rilascio -o StrictHostKeyChecking=yes -o BatchMode=yes -o HostKeyAlgorithms=ssh-ed25519" >> "$GITHUB_ENV"
+
+      - name: Prova (non cambia niente)
+        if: inputs.modo == 'prova'
+        env:
+          UTENTE: ${{ secrets.SERVER_USER }}
+        run: $SSH "$UTENTE@$HOST" 'bash -s -- stato' < deploy/server.sh
+
+      - name: Rilascio
+        if: inputs.modo == 'rilascio'
+        env:
+          UTENTE: ${{ secrets.SERVER_USER }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ATTORE: ${{ github.actor }}
+          REGISTRO: ghcr.io/${{ github.repository_owner }}
+          RAMO: ${{ github.ref_name }}
+          SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+        run: |
+          if ! printf '%s' "$RAMO" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
+            echo "::error::Nome di ramo non valido: $RAMO"
+            exit 1
+          fi
+          # il token scade a fine lavoro: passa per stdin, mai sulla riga di comando
+          printf '%s' "$GH_TOKEN" | $SSH "$UTENTE@$HOST" "docker login ghcr.io -u '$ATTORE' --password-stdin" > /dev/null \
+            || echo "::warning::Accesso al registro non riuscito: il server costruira' l'immagine da se'"
+          # la password demo viaggia nello script (stdin), non sulla riga di comando
+          { printf 'export SEED_PASSWORD_NUOVA=%q\n' "$SEED_PASSWORD"; cat deploy/server.sh; } \
+            | $SSH "$UTENTE@$HOST" "REGISTRO='$REGISTRO' RAMO='$RAMO' bash -s -- rilascia"
+
+      - name: Fuori dal registro
+        if: always() && inputs.modo == 'rilascio'
+        env:
+          UTENTE: ${{ secrets.SERVER_USER }}
+        run: $SSH "$UTENTE@$HOST" 'docker logout ghcr.io' > /dev/null 2>&1 || true
+
+      - name: Via la chiave
+        if: always()
+        run: rm -f ~/.ssh/rilascio
