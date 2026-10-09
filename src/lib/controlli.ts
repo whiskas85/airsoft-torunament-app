@@ -58,9 +58,9 @@ export async function controlliEvento(eventoId: string) {
       messaggio: senzaArbitro.length
         ? `Obiettivi senza arbitro che ha accettato: ${senzaArbitro.map((o) => o.codice).join(', ')}`
         : 'Ogni obiettivo con arbitro ha un arbitro che ha accettato',
-      ok: senzaArbitro.length === 0, bloccante: true, dove: 'arbitri',
+      ok: senzaArbitro.length === 0, bloccante: true, dove: 'staff',
     },
-    { messaggio: 'Capo arbitro designato e confermato', ok: ev.arbitri.some((a) => a.stato === 'ACCETTATA' && a.ruoli.includes('CAPO_ARBITRO')), bloccante: false, dove: 'arbitri' },
+    { messaggio: 'Capo arbitro designato e confermato', ok: ev.arbitri.some((a) => a.stato === 'ACCETTATA' && a.ruoli.includes('CAPO_ARBITRO')), bloccante: false, dove: 'staff' },
     {
       messaggio: senzaPunti.length
         ? `Tabella punteggi incompleta: ${senzaPunti.map((o) => o.codice).join(', ')}`

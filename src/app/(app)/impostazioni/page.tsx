@@ -12,6 +12,7 @@ export default async function Impostazioni() {
   ]);
 
   const voci = [
+    { href: '/impostazioni/coordinamenti', titolo: 'Coordinamenti', testo: 'Piemonte, Liguria…, Nazionale, e i loro responsabili.', n: coordinamenti },
     { href: '/impostazioni/tipologie', titolo: 'Tipologie di gara', testo: 'PLR, PCR…: parametri, tipi di obiettivo e regole di punteggio.', n: tipologie },
     { href: '/campionati', titolo: 'Campionati', testo: 'Stagioni e tappe, per ogni tipologia.', n: null },
     { href: '/impostazioni/template', titolo: 'Template delle schede', testo: 'Le schede che compilano gli arbitri. Impostazione avanzata.', n: template },
@@ -21,7 +22,6 @@ export default async function Impostazioni() {
     <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
       <div>
         <h1 className="text-xl font-bold">Impostazioni</h1>
-        <p className="text-sm text-tenue">{coordinamenti} coordinamenti.</p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {voci.map((v) => (

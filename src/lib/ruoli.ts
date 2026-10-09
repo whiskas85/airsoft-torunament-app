@@ -2,15 +2,17 @@ import 'server-only';
 import { prisma } from './db';
 import type { UtenteCorrente } from './auth';
 
-export type RuoloInEvento = 'AMMINISTRATORE' | 'DIREZIONE' | 'ARBITRO' | 'SQUADRA';
+export type RuoloInEvento = 'AMMINISTRATORE' | 'RESPONSABILE' | 'ORGANIZZAZIONE' | 'DIREZIONE' | 'ARBITRO' | 'SQUADRA';
 
 /** Gli eventi visibili all'utente, ciascuno con i ruoli che l'utente ha al suo interno. */
 export async function mieiEventi(u: UtenteCorrente) {
   const entiAdmin = u.ruoli.filter((r) => r.ruolo === 'AMMINISTRATORE').map((r) => r.enteId);
+  const mieiCoord = u.ruoli.filter((r) => r.ruolo === 'RESPONSABILE' && r.coordinamentoId).map((r) => r.coordinamentoId!);
   const eventi = await prisma.evento.findMany({
     where: {
       OR: [
         { enteId: { in: entiAdmin } },
+        { coordinamenti: { some: { coordinamentoId: { in: mieiCoord } } } },
         { direzione: { some: { utenteId: u.id } } },
         { arbitri: { some: { personaId: u.personaId } } },
         { squadre: { some: { partecipanti: { some: { personaId: u.personaId } } } } },
@@ -21,6 +23,7 @@ export async function mieiEventi(u: UtenteCorrente) {
     include: {
       versioneTipologia: { include: { tipologia: true } },
       direzione: { where: { utenteId: u.id } },
+      coordinamenti: { where: { coordinamentoId: { in: mieiCoord } } },
       arbitri: { where: { personaId: u.personaId } },
       squadre: {
         where: {
@@ -38,7 +41,9 @@ export async function mieiEventi(u: UtenteCorrente) {
   return eventi.map((e) => {
     const ruoli: RuoloInEvento[] = [];
     if (entiAdmin.includes(e.enteId)) ruoli.push('AMMINISTRATORE');
-    if (e.direzione.length) ruoli.push('DIREZIONE');
+    else if (e.coordinamenti.length) ruoli.push('RESPONSABILE');
+    if (e.direzione.some((d) => d.ruolo === 'ORGANIZZAZIONE')) ruoli.push('ORGANIZZAZIONE');
+    if (e.direzione.some((d) => d.ruolo !== 'ORGANIZZAZIONE')) ruoli.push('DIREZIONE');
     if (e.arbitri.length) ruoli.push('ARBITRO');
     if (e.squadre.length) ruoli.push('SQUADRA');
     return { ...e, ruoli, miaSquadra: e.squadre[0]?.squadra ?? null };
@@ -47,6 +52,8 @@ export async function mieiEventi(u: UtenteCorrente) {
 
 export const NOME_RUOLO: Record<RuoloInEvento, string> = {
   AMMINISTRATORE: 'Ente',
+  RESPONSABILE: 'Coordinamento',
+  ORGANIZZAZIONE: 'Organizzatore',
   DIREZIONE: 'Direzione gara',
   ARBITRO: 'Arbitro',
   SQUADRA: 'Squadra',

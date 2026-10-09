@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { richiediUtente } from '@/lib/auth';
-import { ErroreRegola, eventoModificabile, puoGestire } from '@/lib/permessi';
+import { controllaCoordinamenti, ErroreRegola, eventoModificabile, organizzatore, puoGestire } from '@/lib/permessi';
 import { esegui, testo, testoOpz, intero, dataOra, tutti, type StatoForm } from '@/lib/form';
 import { controlliEvento, puoPassare } from '@/lib/controlli';
 import { costruisciConfigurazione } from '@/lib/congelamento';
@@ -36,10 +36,11 @@ export async function creaEvento(_p: StatoForm, fd: FormData): Promise<StatoForm
   const u = await richiediUtente();
   let codice = '';
   const r = await esegui(async () => {
+    const o = organizzatore(u);
+    if (!o) throw new ErroreRegola('Solo l’ente e i responsabili dei coordinamenti creano gli eventi.');
     const versione = await prisma.versioneTipologia.findUnique({ where: { id: testo(fd, 'versioneTipologiaId') }, include: { tipologia: true } });
-    if (!versione || versione.stato !== 'PUBBLICATA') throw new ErroreRegola('Scegli una tipologia di gara pubblicata.');
-    const enteId = versione.tipologia.enteId;
-    if (!u.ruoli.some((x) => x.ruolo === 'AMMINISTRATORE' && x.enteId === enteId)) throw new ErroreRegola('Solo l’ente crea gli eventi.');
+    if (!versione || versione.stato !== 'PUBBLICATA' || versione.tipologia.enteId !== o.enteId) throw new ErroreRegola('Scegli una tipologia di gara.');
+    const enteId = o.enteId;
 
     const nome = testo(fd, 'nome');
     const inizio = dataOra(fd, 'inizio');
@@ -48,14 +49,24 @@ export async function creaEvento(_p: StatoForm, fd: FormData): Promise<StatoForm
     if (!inizio || !fine || fine <= inizio) throw new ErroreRegola('Inizio e fine: la fine deve venire dopo l’inizio.');
 
     const coordinamenti = tutti(fd, 'coordinamenti');
-    const campionati = tutti(fd, 'campionati');
+    controllaCoordinamenti(o, coordinamenti);
+
+    // tappa di campionato o gara open (C1-13); il campionato deve essere della stessa tipologia (C1-11)
+    let campionatoId: string | null = null;
+    if (testo(fd, 'tipoGara') === 'CAMPIONATO') {
+      const c = await prisma.campionato.findFirst({ where: { id: testo(fd, 'campionatoId'), enteId } });
+      if (!c) throw new ErroreRegola('Scegli il campionato, oppure «Gara open».');
+      if (c.tipologiaId !== versione.tipologiaId) throw new ErroreRegola('Il campionato è di un’altra tipologia di gara.');
+      campionatoId = c.id;
+    }
     codice = await nuovoCodice(versione.tipologia.codice, inizio);
     await prisma.evento.create({
       data: {
         codice, nome, enteId, inizio, fine, luogo: testoOpz(fd, 'luogo'), versioneTipologiaId: versione.id,
         opzioni: opzioniDaForm(fd, versione.parametri as Parametri),
         coordinamenti: { create: coordinamenti.map((coordinamentoId) => ({ coordinamentoId })) },
-        campionati: { create: campionati.map((campionatoId) => ({ campionatoId, tappa: intero(fd, `tappa_${campionatoId}`) })) },
+        // il numero di tappa non si salva: è l'ordine delle date nel campionato (C1-20)
+        campionati: { create: campionatoId ? [{ campionatoId }] : [] },
         // la tabella punteggi parte dalle regole predefinite della tipologia; i valori per obiettivo si aggiungono dopo
         tabella: { create: { regole: { ...(versione.regolePredefinite as object), obiettivi: {} } } },
       },

@@ -8,6 +8,7 @@ export type AccountProva = { email: string; etichetta: string; dettaglio: string
 
 export const ACCOUNT_PROVA: AccountProva[] = [
   { email: 'admin@demo.torneo', etichetta: 'Ente', dettaglio: 'Amministratore FIGT', gruppo: 'Organizzazione' },
+  { email: 'responsabile@demo.torneo', etichetta: 'Coordinamento', dettaglio: 'Responsabile Piemonte', gruppo: 'Organizzazione' },
   { email: 'direzione@demo.torneo', etichetta: 'Direzione gara', dettaglio: 'Eventi demo', gruppo: 'Organizzazione' },
   { email: 'arbitro1@demo.torneo', etichetta: 'Arbitro 1', dettaglio: 'Capo arbitro · nazionale', gruppo: 'Arbitri' },
   { email: 'arbitro2@demo.torneo', etichetta: 'Arbitro 2', dettaglio: 'Obiettivo · regionale', gruppo: 'Arbitri' },

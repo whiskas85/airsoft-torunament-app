@@ -21,6 +21,11 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
     },
   });
   const nascosti = { eventoId: ev.id };
+  // numero di tappa: posizione per data dentro al campionato (C1-20)
+  const tappe = await Promise.all(conteggi.campionati.map(async (c) => ({
+    nome: c.campionato.nome,
+    numero: await prisma.eventoCampionato.count({ where: { campionatoId: c.campionatoId, evento: { inizio: { lte: ev.inizio } } } }),
+  })));
 
   return (
     <div className="space-y-6">
@@ -28,7 +33,7 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
         {[
           ['Obiettivi', conteggi._count.obiettivi, 'obiettivi'],
           ['Squadre iscritte', conteggi._count.squadre, 'squadre'],
-          ...(gestore || ruoli.includes('ARBITRO') ? [['Arbitri', conteggi._count.arbitri, 'arbitri']] : []),
+          ...(gestore || ruoli.includes('ARBITRO') ? [['Arbitri', conteggi._count.arbitri, 'staff']] : []),
           ['Documenti', conteggi._count.documenti, 'documenti'],
         ].map(([t, n, p]) => (
           <Link key={t} href={`/eventi/${ev.codice}/${p}`} className="carta block hover:ring-1 hover:ring-accento">
@@ -40,7 +45,7 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
 
       <section className="carta text-sm">
         <div><span className="text-tenue">Tipologia:</span> {ev.versioneTipologia.tipologia.nome} (versione {ev.versioneTipologia.numero}) — operatori {parametri.operatori.min}–{parametri.operatori.max}, finestre {parametri.finestra.minMin}–{parametri.finestra.maxMin} min, {parametri.finestra.modalita === 'PRENOTATA' ? 'prenotate' : 'coda all’ingresso'}</div>
-        <div><span className="text-tenue">Campionati:</span> {conteggi.campionati.map((c) => `${c.campionato.nome}${c.tappa ? `, tappa ${c.tappa}` : ''}`).join(' · ') || 'nessuno (gara non di campionato)'}</div>
+        <div><span className="text-tenue">Campionati:</span> {tappe.map((t) => `${t.nome}, tappa ${t.numero}`).join(' · ') || 'nessuno (gara open)'}</div>
         {conteggi.arbitri[0] && (
           <div><span className="text-tenue">La tua designazione:</span> {conteggi.arbitri[0].stato.toLowerCase()} — {conteggi.arbitri[0].ruoli.join(', ').toLowerCase()}</div>
         )}

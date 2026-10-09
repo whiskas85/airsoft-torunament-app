@@ -6,10 +6,11 @@ import { NOME_RUOLO_ARBITRO, RUOLI_ARBITRO } from '@/lib/arbitri';
 import { FormAzione } from '@/components/FormAzione';
 import { RispostaDesignazione } from '@/components/RispostaDesignazione';
 import { impostaArbitro, proponiArbitro, rimuoviArbitro } from '@/actions/arbitri';
+import { aggiungiStaff, togliStaff } from '@/actions/staff';
 
 const STATO = { PROPOSTA: ['in attesa di risposta', 'bg-avviso text-black'], ACCETTATA: ['accettata', 'bg-ok text-black'], RIFIUTATA: ['rifiutata', 'bg-errore'] } as const;
 
-export default async function Arbitri({ params }: { params: Promise<{ codice: string }> }) {
+export default async function Staff({ params }: { params: Promise<{ codice: string }> }) {
   const { codice } = await params;
   const { ev, gestore, modificabile, u, ruoli } = await contestoEvento(codice);
   // le squadre non vedono lo staff arbitrale (C1-32)
@@ -36,6 +37,13 @@ export default async function Arbitri({ params }: { params: Promise<{ codice: st
 
   const mia = staff.find((a) => a.personaId === u.personaId);
 
+  // organizzatori e direzione (C1-15), squadre organizzatrici (C1-14)
+  const [membri, utenti] = await Promise.all([
+    prisma.membroDirezione.findMany({ where: { eventoId: ev.id }, include: { utente: { include: { persona: true } } }, orderBy: { id: 'asc' } }),
+    gestore ? prisma.utente.findMany({ where: { attivo: true }, include: { persona: true }, orderBy: [{ persona: { cognome: 'asc' } }, { persona: { nome: 'asc' } }] }) : [],
+  ]);
+  const organizzatrici = iscritte.filter((s) => s.ruolo === 'ORGANIZZATRICE');
+
   // persone qualificate dell'ente non ancora nello staff, con l'eventuale impegno sovrapposto
   const candidati = gestore && modificabile
     ? await prisma.qualificaArbitro.findMany({
@@ -49,6 +57,43 @@ export default async function Arbitri({ params }: { params: Promise<{ codice: st
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        {([['ORGANIZZAZIONE', 'Organizzatori', 'Gestiscono l’evento come l’ente: obiettivi, squadre, staff.'], ['DIREZIONE', 'Direzione di gara', 'Code, contestazioni, debriefing e classifica durante la gara.']] as const).map(([ruolo, titolo, testo]) => {
+          const qui = membri.filter((m) => (ruolo === 'ORGANIZZAZIONE' ? m.ruolo === 'ORGANIZZAZIONE' : m.ruolo !== 'ORGANIZZAZIONE'));
+          return (
+            <section key={ruolo} className="carta space-y-2">
+              <h2 className="font-semibold">{titolo}</h2>
+              <p className="text-xs text-tenue">{testo}</p>
+              {qui.length === 0 && <p className="text-sm text-tenue">Nessuno.</p>}
+              <ul className="space-y-1">
+                {qui.map((m) => (
+                  <li key={m.id} className="flex items-center gap-2 text-sm">
+                    <span>{m.utente.persona.nome} {m.utente.persona.cognome}</span>
+                    {gestore && <FormAzione azione={togliStaff} nascosti={{ membroId: m.id }} etichetta="Togli" secondario classe="ml-auto" />}
+                  </li>
+                ))}
+              </ul>
+              {gestore && (
+                <FormAzione azione={aggiungiStaff} nascosti={{ eventoId: ev.id, ruolo }} etichetta="Aggiungi" secondario classe="flex gap-2 border-t border-bordo pt-2">
+                  <select name="utenteId" required defaultValue="" className="campo min-w-0 flex-1 py-1.5">
+                    <option value="" disabled>Scegli una persona…</option>
+                    {utenti.filter((x) => !qui.some((m) => m.utenteId === x.id)).map((x) => <option key={x.id} value={x.id}>{x.persona.cognome} {x.persona.nome}</option>)}
+                  </select>
+                </FormAzione>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      <section className="carta space-y-1">
+        <h2 className="font-semibold">Squadre organizzatrici</h2>
+        {organizzatrici.length === 0
+          ? <p className="text-sm text-tenue">Nessuna. Si indicano dalla scheda Squadre, con il ruolo «Organizzatrice».</p>
+          : <p className="text-sm">{organizzatrici.map((s) => s.squadra.nome).join(', ')}</p>}
+      </section>
+
+      <h2 className="text-lg font-semibold">Arbitri</h2>
       {mia && (
         <section className="carta space-y-2 ring-1 ring-accento">
           <h2 className="text-lg font-semibold">La tua designazione</h2>

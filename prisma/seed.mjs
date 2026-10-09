@@ -22,11 +22,13 @@ function canonico(v) {
 const hash = (v) => createHash('sha256').update(canonico(v)).digest('hex');
 
 async function main() {
-  if (await prisma.ente.findUnique({ where: { sigla: 'FIGT' } })) {
-    console.log('Dati iniziali già presenti: niente da fare (per ripartire: npx prisma migrate reset).');
+  const password = await bcrypt.hash(process.env.SEED_PASSWORD || 'torneo2026', 10);
+  const esistente = await prisma.ente.findUnique({ where: { sigla: 'FIGT' } });
+  if (esistente) {
+    await integra(esistente, password);
+    console.log('Dati iniziali già presenti: aggiunti solo gli account di prova nuovi (per ripartire: npx prisma migrate reset).');
     return;
   }
-  const password = await bcrypt.hash(process.env.SEED_PASSWORD || 'torneo2026', 10);
 
   // ── ente e coordinamento
   const ente = await prisma.ente.create({
@@ -91,6 +93,7 @@ async function main() {
   const admin = await persona('Amministratore', 'Ente', 'admin@demo.torneo');
   await prisma.ruoloEnte.create({ data: { utenteId: (await utente('admin@demo.torneo')).id, enteId: ente.id, ruolo: 'AMMINISTRATORE' } });
   await persona('Direzione', 'Gara', 'direzione@demo.torneo');
+  await integra(ente, password);
   const arbitri = [];
   for (const [i, livello] of ['NAZIONALE', 'REGIONALE', 'REGIONALE', 'AUSILIARE'].entries()) {
     const p = await persona('Arbitro', `${i + 1}`, `arbitro${i + 1}@demo.torneo`);
@@ -204,7 +207,19 @@ async function main() {
   });
 
   console.log('Dati iniziali creati. Account di prova (password in SEED_PASSWORD):');
-  console.log('  admin@demo.torneo · direzione@demo.torneo · arbitro1..4@demo.torneo · zdt/alfa/bravo/charlie/delta@demo.torneo');
+  console.log('  admin@demo.torneo · responsabile@demo.torneo · direzione@demo.torneo · arbitro1..4@demo.torneo · zdt/alfa/bravo/charlie/delta@demo.torneo');
+}
+
+/**
+ * Account di prova aggiunti dopo la prima versione del seed: si creano anche su un database già popolato
+ * (il seed altrimenti non fa nulla), così i pulsanti di accesso rapido funzionano dappertutto.
+ */
+async function integra(ente, password) {
+  const piemonte = await prisma.coordinamento.findFirst({ where: { enteId: ente.id, nome: 'Piemonte' } });
+  if (!piemonte || (await prisma.utente.findUnique({ where: { email: 'responsabile@demo.torneo' } }))) return;
+  const p = await prisma.persona.create({ data: { nome: 'Responsabile', cognome: 'Piemonte' } });
+  const u = await prisma.utente.create({ data: { personaId: p.id, email: 'responsabile@demo.torneo', passwordHash: password } });
+  await prisma.ruoloEnte.create({ data: { utenteId: u.id, enteId: ente.id, ruolo: 'RESPONSABILE', coordinamentoId: piemonte.id } });
 }
 
 main().then(() => prisma.$disconnect()).catch(async (e) => { console.error(e); await prisma.$disconnect(); process.exit(1); });

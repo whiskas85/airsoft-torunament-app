@@ -46,10 +46,11 @@ model Coordinamento {
   ente    Ente   @relation(fields: [enteId], references: [id])
   nome    String
 
-  squadre    Squadra[]
-  qualifiche QualificaArbitro[]
-  eventi     EventoCoordinamento[]
-  campionati CampionatoCoordinamento[]
+  squadre      Squadra[]
+  qualifiche   QualificaArbitro[]
+  eventi       EventoCoordinamento[]
+  campionati   CampionatoCoordinamento[]
+  responsabili RuoloEnte[]
 
   @@unique([enteId, nome])
 }
@@ -117,7 +118,8 @@ model Dispositivo {
 }
 
 enum TipoRuoloEnte {
-  AMMINISTRATORE   // configura l'ente: tipologie, template, campionati, eventi
+  AMMINISTRATORE   // configura l'ente: coordinamenti, tipologie, template, campionati, eventi
+  RESPONSABILE     // responsabile di un coordinamento: organizza le sue gare e i suoi campionati
   RESP_ARBITRI     // designa e gestisce gli arbitri
   SEGRETERIA       // iscrizioni e pagamenti
 }
@@ -129,9 +131,11 @@ model RuoloEnte {
   enteId          String
   ente            Ente          @relation(fields: [enteId], references: [id])
   ruolo           TipoRuoloEnte
+  /// per il RESPONSABILE: il coordinamento che segue (uno per riga)
   coordinamentoId String?
+  coordinamento   Coordinamento? @relation(fields: [coordinamentoId], references: [id])
 
-  @@unique([utenteId, enteId, ruolo])
+  @@unique([utenteId, enteId, ruolo, coordinamentoId])
 }
 
 model QualificaArbitro {
@@ -192,6 +196,8 @@ model TipologiaGara {
   ente     Ente    @relation(fields: [enteId], references: [id])
   codice   String
   nome     String
+  /// archiviata: non si propone per nuovi eventi e campionati, ma resta per quelli che la usano
+  archiviata Boolean @default(false)
 
   versioni   VersioneTipologia[]
   campionati Campionato[]
