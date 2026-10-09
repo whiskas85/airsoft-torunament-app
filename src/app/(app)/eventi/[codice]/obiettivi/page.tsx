@@ -70,7 +70,7 @@ export default async function Obiettivi({ params }: { params: Promise<{ codice: 
       {gestore && modificabile && (
         <section className="carta">
           <h2 className="mb-3 text-lg font-semibold">Nuovo obiettivo</h2>
-          <FormAzione azione={creaObiettivo} nascosti={{ eventoId: ev.id }} etichetta="Crea obiettivo" svuotaSeOk>
+          <FormAzione azione={creaObiettivo} nascosti={{ eventoId: ev.id }} dati svuotaSeOk>
             <CampiObiettivo tipi={tipi} sequenza={parametri.obiettiviInSequenza} finestra={parametri.finestra} prossimoCodice={prossimo} />
           </FormAzione>
         </section>

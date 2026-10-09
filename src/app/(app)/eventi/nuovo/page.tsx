@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { richiediUtente } from '@/lib/auth';
-import { Intestazione } from '@/components/Intestazione';
 import { FormAzione } from '@/components/FormAzione';
 import { CampiEvento } from '@/components/CampiEvento';
 import { creaEvento } from '@/actions/eventi';
@@ -13,7 +12,7 @@ export default async function NuovoEvento() {
   if (enti.length === 0) notFound();
 
   const [versioni, coordinamenti, campionati] = await Promise.all([
-    prisma.versioneTipologia.findMany({ where: { stato: 'PUBBLICATA', tipologia: { enteId: { in: enti } } }, include: { tipologia: { include: { ente: true } } }, orderBy: { numero: 'desc' } }),
+    prisma.versioneTipologia.findMany({ where: { stato: 'PUBBLICATA', tipologia: { enteId: { in: enti } } }, include: { tipologia: true }, orderBy: { numero: 'desc' } }),
     prisma.coordinamento.findMany({ where: { enteId: { in: enti } }, orderBy: { nome: 'asc' } }),
     prisma.campionato.findMany({ where: { enteId: { in: enti } }, include: { tipologia: true }, orderBy: { nome: 'asc' } }),
   ]);
@@ -22,17 +21,16 @@ export default async function NuovoEvento() {
 
   return (
     <>
-      <Intestazione utente={u} />
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <Link href="/" className="link text-sm">← Home</Link>
+        <Link href="/eventi" className="link text-sm">← Eventi</Link>
         <h1 className="text-xl font-bold">Nuovo evento</h1>
-        <p className="text-sm text-tenue">L’evento eredita dalla tipologia regolamento, template, tipi di obiettivo, parametri e regole di punteggio. Nasce in bozza: lo vedi solo tu finché non lo pubblichi.</p>
+        <p className="text-sm text-tenue">L’evento eredita dalla tipologia regolamento, template, tipi di obiettivo, parametri e regole di punteggio. Nasce in bozza: lo vedi solo tu finché non lo pubblichi. Compila e premi <b>Salva</b> in alto.</p>
         <section className="carta">
-          <FormAzione azione={creaEvento} etichetta="Crea l’evento">
+          <FormAzione azione={creaEvento} dati>
             <div>
               <label className="etichetta">Tipologia di gara</label>
               <select name="versioneTipologiaId" required className="campo">
-                {ultime.map((v) => <option key={v.id} value={v.id}>{v.tipologia.codice} · {v.tipologia.nome} (versione {v.numero}) · {v.tipologia.ente.sigla}</option>)}
+                {ultime.map((v) => <option key={v.id} value={v.id}>{v.tipologia.codice} · {v.tipologia.nome} (versione {v.numero})</option>)}
               </select>
             </div>
             <CampiEvento />

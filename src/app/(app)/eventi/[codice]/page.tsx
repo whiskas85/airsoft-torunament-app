@@ -28,7 +28,7 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
         {[
           ['Obiettivi', conteggi._count.obiettivi, 'obiettivi'],
           ['Squadre iscritte', conteggi._count.squadre, 'squadre'],
-          ['Arbitri', conteggi._count.arbitri, 'arbitri'],
+          ...(gestore || ruoli.includes('ARBITRO') ? [['Arbitri', conteggi._count.arbitri, 'arbitri']] : []),
           ['Documenti', conteggi._count.documenti, 'documenti'],
         ].map(([t, n, p]) => (
           <Link key={t} href={`/eventi/${ev.codice}/${p}`} className="carta block hover:ring-1 hover:ring-accento">
@@ -52,7 +52,7 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
       {gestore && modificabile && (
         <section className="carta">
           <h2 className="mb-3 text-lg font-semibold">Dati dell’evento</h2>
-          <FormAzione azione={aggiornaEvento} nascosti={nascosti}>
+          <FormAzione azione={aggiornaEvento} nascosti={nascosti} dati>
             <CampiEvento valori={{ ...ev, opzioni: ev.opzioni as object }} parametri={parametri} />
           </FormAzione>
         </section>
