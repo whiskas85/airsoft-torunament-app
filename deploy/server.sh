@@ -13,6 +13,8 @@
 #   REGISTRO      es. ghcr.io/whiskas85: l'immagine si scarica da lì (tag = commit)
 #   RAMO          il ramo da mettere in produzione (predefinito main)
 #   SEED_PASSWORD_NUOVA  password degli account demo, solo alla prima installazione
+#   DEBUG         attivo = accesso rapido con gli account di prova (e dati demo,
+#                 se mancano); spento = come una produzione vera; vuoto = invariato
 set -euo pipefail
 
 CARTELLA=/opt/tournament-app
@@ -21,6 +23,7 @@ PROXY_SITI=/opt/gestionale/siti
 DOMINIO=tournament-app.zerodarkteam.it
 RAMO=${RAMO:-main}
 REGISTRO=${REGISTRO:-}
+DEBUG=${DEBUG:-}
 
 ta() { docker compose -p tournament-app -f "$CARTELLA/docker-compose.prod.yml" --env-file "$CARTELLA/.env.prod" --project-directory "$CARTELLA" "$@"; }
 
@@ -40,6 +43,26 @@ dns_pronto() {
   questo=$(indirizzo "$DOMINIO")
   echo "DNS: $DOMINIO -> ${questo:-nessun indirizzo} (questa macchina: ${nostro:-?})"
   [ -n "$questo" ] && [ "$questo" = "$nostro" ]
+}
+
+# imposta (o aggiunge) una variabile in .env.prod
+imposta() {
+  if grep -q "^$1=" "$CARTELLA/.env.prod"; then
+    sed -i "s|^$1=.*|$1=$2|" "$CARTELLA/.env.prod"
+  else
+    printf '%s=%s\n' "$1" "$2" >> "$CARTELLA/.env.prod"
+  fi
+}
+
+modo_debug() {
+  case "$DEBUG" in
+    attivo)
+      imposta DEBUG_LOGIN 1
+      # gli account di prova servono: il seed non fa nulla se ci sono già
+      imposta SEED_DEMO 1 ;;
+    spento) imposta DEBUG_LOGIN 0 ;;
+  esac
+  echo "accesso rapido (DEBUG_LOGIN): $(grep -m1 '^DEBUG_LOGIN=' "$CARTELLA/.env.prod" | cut -d= -f2 || true) · dati demo (SEED_DEMO): $(grep -m1 '^SEED_DEMO=' "$CARTELLA/.env.prod" | cut -d= -f2 || true)"
 }
 
 salute() {
@@ -67,6 +90,7 @@ stato() {
       || echo "non ancora installata: il primo «rilascio» la crea"
   fi
   echo "== .env.prod: $( [ -f "$CARTELLA/.env.prod" ] && echo presente || echo assente )"
+  [ -f "$CARTELLA/.env.prod" ] && grep -E '^(DEBUG_LOGIN|SEED_DEMO|DOMINIO)=' "$CARTELLA/.env.prod" || true
   echo "== Container"
   docker ps -a --filter name='^ta-' --format '{{.Names}}\t{{.Image}}\t{{.Status}}'
   echo "== Proxy nella rete ta-bordo"
@@ -174,6 +198,7 @@ rilascia() {
   fi
   echo "== Codice: $(git -C "$CARTELLA" log --oneline -1)"
   [ -f "$CARTELLA/.env.prod" ] || crea_env
+  modo_debug
 
   echo "== Backup"
   backup

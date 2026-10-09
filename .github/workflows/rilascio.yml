@@ -29,6 +29,11 @@ on:
         type: choice
         options: [prova, rilascio]
         default: prova
+      debug:
+        description: 'Per «rilascio»: accesso rapido con gli account di prova (attivo per il collaudo)'
+        type: choice
+        options: [invariato, attivo, spento]
+        default: invariato
 
 # mai due lavori insieme sulla stessa macchina
 concurrency:
@@ -116,6 +121,7 @@ jobs:
           REGISTRO: ghcr.io/${{ github.repository_owner }}
           RAMO: ${{ github.ref_name }}
           SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+          DEBUG: ${{ inputs.debug }}
         run: |
           if ! printf '%s' "$RAMO" | grep -Eq '^[A-Za-z0-9._/-]+$'; then
             echo "::error::Nome di ramo non valido: $RAMO"
@@ -126,7 +132,7 @@ jobs:
             || echo "::warning::Accesso al registro non riuscito: il server costruira' l'immagine da se'"
           # la password demo viaggia nello script (stdin), non sulla riga di comando
           { printf 'export SEED_PASSWORD_NUOVA=%q\n' "$SEED_PASSWORD"; cat deploy/server.sh; } \
-            | $SSH "$UTENTE@$HOST" "REGISTRO='$REGISTRO' RAMO='$RAMO' bash -s -- rilascia"
+            | $SSH "$UTENTE@$HOST" "REGISTRO='$REGISTRO' RAMO='$RAMO' DEBUG='$DEBUG' bash -s -- rilascia"
 
       - name: Fuori dal registro
         if: always() && inputs.modo == 'rilascio'

@@ -34,7 +34,7 @@ npm run dev                      # http://localhost:3100
 ```
 
 Con `DEBUG_LOGIN=1` (già impostato in `.env.example`) la pagina di accesso mostra un **pulsante per ogni account
-di prova**: si entra con un clic, senza password. In produzione è forzato a `0` nel compose e i pulsanti non esistono.
+di prova**: si entra con un clic, senza password. In produzione è spento (`0`) se non lo si accende dal rilascio (opzione `debug`, vedi [DEPLOY](deploy/DEPLOY.md)).
 
 Account di prova (password = `SEED_PASSWORD` in `.env`):
 
