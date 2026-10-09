@@ -25,6 +25,17 @@ internet ──443──▶ zd-proxy (Caddy, del team-management)
   - sempre: `zd-proxy` collegato alla rete `ta-bordo` e `deploy/tournament-app.caddy` copiato in
     `/opt/gestionale/siti/` con reload del proxy, **solo se il DNS punta già alla macchina**.
 
+### Modalità di collaudo (debug)
+
+Nel `rilascio`, l'opzione `debug`:
+- `attivo`: pulsanti di accesso rapido con gli account di prova nella pagina di accesso (`DEBUG_LOGIN=1`),
+  e dati demo creati se mancano. Per la fase di prova.
+- `spento`: come una produzione vera, si entra solo con email e password.
+- `invariato` (predefinito): resta com'è.
+
+La scelta si salva in `/opt/tournament-app/.env.prod` e vale anche per i rilasci successivi.
+**Da spegnere prima di un evento vero**: con il debug acceso chiunque apra il sito entra come admin.
+
 ### Da fare una volta sola
 
 1. **DNS**: record `A` di `tournament-app.zerodarkteam.it` verso lo stesso indirizzo di `ops.zerodarkteam.it`.
