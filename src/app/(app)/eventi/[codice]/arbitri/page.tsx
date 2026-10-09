@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { contestoEvento } from '@/lib/contesto';
 import { fmtDataOra } from '@/lib/formato';
@@ -10,7 +11,9 @@ const STATO = { PROPOSTA: ['in attesa di risposta', 'bg-avviso text-black'], ACC
 
 export default async function Arbitri({ params }: { params: Promise<{ codice: string }> }) {
   const { codice } = await params;
-  const { ev, gestore, modificabile, u } = await contestoEvento(codice);
+  const { ev, gestore, modificabile, u, ruoli } = await contestoEvento(codice);
+  // le squadre non vedono lo staff arbitrale (C1-32)
+  if (!gestore && !ruoli.includes('ARBITRO')) notFound();
 
   const [staff, obiettivi, tipi, iscritte] = await Promise.all([
     prisma.arbitroEvento.findMany({
@@ -74,7 +77,7 @@ export default async function Arbitri({ params }: { params: Promise<{ codice: st
               {a.motivoRifiuto && <p className="mt-1 text-sm text-tenue">Motivo del rifiuto: {a.motivoRifiuto}</p>}
               {gestore && modificabile ? (
                 <div className="mt-3 space-y-3">
-                  <FormAzione azione={impostaArbitro} nascosti={{ arbitroEventoId: a.id }} etichetta="Salva ruoli e obiettivi">
+                  <FormAzione azione={impostaArbitro} nascosti={{ arbitroEventoId: a.id }} dati>
                     <div className="flex flex-wrap gap-3 text-sm">
                       {RUOLI_ARBITRO.map((r) => (
                         <label key={r} className="flex items-center gap-1.5"><input type="checkbox" name="ruoli" value={r} defaultChecked={a.ruoli.includes(r)} className="h-4 w-4" /> {NOME_RUOLO_ARBITRO[r]}</label>

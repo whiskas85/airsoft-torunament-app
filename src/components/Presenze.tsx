@@ -29,7 +29,7 @@ export async function Presenze({ squadraEventoId, modificabile, operatori }: {
 
   return (
     <div className="space-y-4">
-      <FormAzione azione={salvaPresenze} nascosti={nascosti} etichetta="Salva presenze">
+      <FormAzione azione={salvaPresenze} nascosti={nascosti} dati>
         <p className="text-sm text-tenue">Fascia {fasce} · servono da {operatori.min} a {operatori.max} operatori, con un capo pattuglia.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

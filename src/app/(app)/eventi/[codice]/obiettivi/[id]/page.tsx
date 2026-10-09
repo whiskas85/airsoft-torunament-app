@@ -30,7 +30,7 @@ export default async function Obiettivo({ params }: { params: Promise<{ codice: 
       <section className="carta">
         <h2 className="mb-3 text-lg font-semibold">{o.codice} · {o.nome}</h2>
         {modificabile ? (
-          <FormAzione azione={aggiornaObiettivo} nascosti={nascosti}>
+          <FormAzione azione={aggiornaObiettivo} nascosti={nascosti} dati>
             <CampiObiettivo tipi={tipi} valori={{ ...o, geometria: o.geometria as object, fasi }} sequenza={parametri.obiettiviInSequenza} finestra={parametri.finestra} />
           </FormAzione>
         ) : (
@@ -45,7 +45,7 @@ export default async function Obiettivo({ params }: { params: Promise<{ codice: 
           (che toglie tanti punti quanti ne vale l’obiettivo).
         </p>
         {modificabile ? (
-          <FormAzione azione={salvaPuntiObiettivo} nascosti={nascosti} etichetta="Salva punteggi">
+          <FormAzione azione={salvaPuntiObiettivo} nascosti={nascosti} dati>
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <label className="etichetta">Valore positivo dell’obiettivo</label>

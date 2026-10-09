@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { richiediUtente } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { Intestazione } from '@/components/Intestazione';
 import { AnteprimaTemplate } from '@/components/AnteprimaTemplate';
 import type { DefinizioneTemplate } from '@/lib/template';
 
@@ -14,9 +13,8 @@ export default async function Template({ params }: { params: Promise<{ id: strin
 
   return (
     <>
-      <Intestazione utente={u} />
       <main className="mx-auto max-w-3xl space-y-4 px-4 py-6">
-        <Link href="/configurazione" className="link text-sm">← Configurazione</Link>
+        <Link href="/impostazioni/template" className="link text-sm">← Template</Link>
         <div>
           <div className="font-mono text-xs text-tenue">{v.template.codice} · versione {v.numero} · {v.stato.toLowerCase()}</div>
           <h1 className="text-xl font-bold">{v.template.nome}</h1>

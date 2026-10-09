@@ -46,6 +46,7 @@ export default async function Squadre({ params }: { params: Promise<{ codice: st
             </section>
           );
         })}
+        <ElencoIscritte iscritte={iscritte} />
       </div>
     );
   }
@@ -74,7 +75,7 @@ export default async function Squadre({ params }: { params: Promise<{ codice: st
                 <span className={`pill ml-auto ${s.pagato ? 'bg-ok text-black' : 'bg-errore'}`}>{s.pagato ? 'pagato' : 'da pagare'}</span>
               </summary>
               <div className="mt-4 space-y-4">
-                <FormAzione azione={impostaSquadraEvento} nascosti={{ squadraEventoId: s.id }} classe="grid items-end gap-3 sm:grid-cols-5">
+                <FormAzione azione={impostaSquadraEvento} nascosti={{ squadraEventoId: s.id }} dati classe="grid items-end gap-3 sm:grid-cols-5">
                   <div>
                     <label className="etichetta">Identificativo</label>
                     <input name="identificativo" defaultValue={s.identificativo} disabled={!modificabile} className="campo font-mono uppercase" />
@@ -121,5 +122,24 @@ function IscriviDaGestione({ eventoId, squadre }: { eventoId: string; squadre: {
         <input name="identificativo" className="campo font-mono uppercase" placeholder="sigla" />
       </div>
     </FormAzione>
+  );
+}
+
+/** Le squadre iscritte, come le vede un partecipante: nome e identificativo, niente altro (C1-31). */
+function ElencoIscritte({ iscritte }: { iscritte: { id: string; identificativo: string; ruolo: keyof typeof NOME_RUOLO; squadra: { nome: string } }[] }) {
+  return (
+    <section className="carta">
+      <h2 className="mb-2 text-lg font-semibold">Squadre iscritte ({iscritte.length})</h2>
+      {iscritte.length === 0 && <p className="text-sm text-tenue">Ancora nessuna.</p>}
+      <ul className="divide-y divide-bordo text-sm">
+        {iscritte.map((s) => (
+          <li key={s.id} className="flex items-center gap-3 py-1.5">
+            <b className="w-24 font-mono">{s.identificativo}</b>
+            <span>{s.squadra.nome}</span>
+            {s.ruolo !== 'GAREGGIA' && <span className="pill ml-auto bg-bordo">{NOME_RUOLO[s.ruolo]}</span>}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

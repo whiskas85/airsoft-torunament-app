@@ -1,7 +1,7 @@
 import 'server-only';
 import { notFound } from 'next/navigation';
 import { prisma } from './db';
-import type { UtenteCorrente } from './auth';
+import { richiediUtente, type UtenteCorrente } from './auth';
 import type { StatoEvento } from '@prisma/client';
 
 /** Stati in cui la configurazione dell'evento si può ancora modificare (§6bis: all'avvio si congela tutto). */
@@ -36,4 +36,15 @@ export async function eventoModificabile(u: UtenteCorrente, eventoId: string) {
 /** La squadra (o le squadre) di cui l'utente è membro attivo. */
 export async function mieSquadre(u: UtenteCorrente) {
   return prisma.squadra.findMany({ where: { membri: { some: { personaId: u.personaId, al: null } } } });
+}
+
+/**
+ * Per le pagine dell'amministrazione: l'utente collegato e il suo ente, oppure 404.
+ * Un'installazione serve un solo ente (D1), quindi l'ente è quello del ruolo.
+ */
+export async function richiediAmministratore() {
+  const u = await richiediUtente();
+  const ruolo = u.ruoli.find((r) => r.ruolo === 'AMMINISTRATORE');
+  if (!ruolo) notFound();
+  return { u, enteId: ruolo.enteId };
 }
