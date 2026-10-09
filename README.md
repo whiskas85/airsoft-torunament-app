@@ -41,6 +41,7 @@ Account di prova (password = `SEED_PASSWORD` in `.env`):
 | Account | Ruolo |
 |---|---|
 | `admin@demo.torneo` | Amministratore dell'ente (vede configurazione e tabella punteggi) |
+| `responsabile@demo.torneo` | Responsabile del coordinamento Piemonte (organizza gare e campionati del Piemonte) |
 | `direzione@demo.torneo` | Direzione gara degli eventi demo |
 | `arbitro1@demo.torneo` … `arbitro4@demo.torneo` | Capo arbitro (1) e arbitri di obiettivo (2–4) |
 | `zdt@`, `alfa@`, `bravo@`, `charlie@`, `delta@demo.torneo` | Capi pattuglia delle squadre (Delta è organizzatrice) |

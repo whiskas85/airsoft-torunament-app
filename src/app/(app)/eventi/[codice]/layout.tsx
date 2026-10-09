@@ -13,7 +13,7 @@ export default async function LayoutEvento({ children, params }: { children: Rea
     schede.push({ percorso: '/squadre', etichetta: 'Squadre' });
   }
   // lo staff arbitrale lo vedono solo chi gestisce e gli arbitri, non le squadre (C1-32)
-  if (gestore || ruoli.includes('ARBITRO')) schede.push({ percorso: '/arbitri', etichetta: 'Staff arbitrale' });
+  if (gestore || ruoli.includes('ARBITRO')) schede.push({ percorso: '/staff', etichetta: 'Staff' });
   schede.push({ percorso: '/documenti', etichetta: 'Documenti' });
 
   return (
@@ -24,7 +24,7 @@ export default async function LayoutEvento({ children, params }: { children: Rea
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="pill bg-accento text-black">{ev.versioneTipologia.tipologia.codice}</span>
             <span className={`pill ${ev.stato === 'IN_CORSO' ? 'bg-ok text-black' : 'bg-bordo text-tenue'}`}>{NOME_STATO_EVENTO[ev.stato]}</span>
-            {gestore && !ruoli.includes('AMMINISTRATORE') && !ruoli.includes('DIREZIONE') && <span className="pill bg-bordo">Gestione</span>}
+            {gestore && ruoli.length === 0 && <span className="pill bg-bordo">Gestione</span>}
             {ruoli.map((r) => <span key={r} className="pill bg-bordo">{NOME_RUOLO[r]}</span>)}
             <span className="ml-auto font-mono text-xs text-tenue">{ev.codice}</span>
           </div>
