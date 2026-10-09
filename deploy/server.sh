@@ -63,7 +63,8 @@ stato() {
       git -C "$CARTELLA" log --oneline "HEAD..origin/$RAMO" || true
     }
   else
-    echo "non ancora installata: il primo «rilascio» la crea"
+    [ -d "$CARTELLA" ] && echo "installata a mano, senza git: il primo «rilascio» la collega al repository" \
+      || echo "non ancora installata: il primo «rilascio» la crea"
   fi
   echo "== .env.prod: $( [ -f "$CARTELLA/.env.prod" ] && echo presente || echo assente )"
   echo "== Container"
@@ -82,8 +83,21 @@ stato() {
 }
 
 prima_installazione() {
-  echo "== Prima installazione in $CARTELLA"
-  git clone -q --branch "$RAMO" "$REPO" "$CARTELLA"
+  if [ -d "$CARTELLA" ]; then
+    # installata a mano, senza git: si salva una copia e la cartella diventa
+    # una copia del repository. .env.prod e gli altri file ignorati restano.
+    echo "== $CARTELLA c'e' gia' ma non e' una copia git: la collego al repository"
+    mkdir -p /root/backup
+    tar -czf "/root/backup/tournament-app-$(date +%F-%H%M).tgz" -C /opt tournament-app
+    echo "copia di sicurezza in /root/backup"
+    git -C "$CARTELLA" init -q
+    git -C "$CARTELLA" remote add origin "$REPO" 2>/dev/null || git -C "$CARTELLA" remote set-url origin "$REPO"
+    git -C "$CARTELLA" fetch -q origin "$RAMO"
+    git -C "$CARTELLA" checkout -q -f -B "$RAMO" "origin/$RAMO"
+  else
+    echo "== Prima installazione in $CARTELLA"
+    git clone -q --branch "$RAMO" "$REPO" "$CARTELLA"
+  fi
 }
 
 crea_env() {
