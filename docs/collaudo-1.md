@@ -108,3 +108,18 @@ Ente (es. FIGT) ── amministratore dell'ente: gestisce i coordinamenti
 - **D3 — OpenStreetMap con satellite Esri** (Leaflet): gratis, nessuna chiave.
 - **D4 — Nomi dei due raggi**: in attesa del testo del regolamento; per ora "area di esecuzione" e "zona obiettivo".
 - **Ordine**: prima interfaccia e organizzazione (C1-01…15), poi evento e obiettivi con mappa, poi motore di gioco.
+
+## Stato (2026-10-13)
+
+| Fase | Punti | Stato |
+|---|---|---|
+| 1 · Interfaccia | C1-01…07, C1-31, C1-32 | Fatto e pubblicato |
+| 2 · Organizzazione | C1-04, C1-08…15, C1-19, C1-20 | Fatto e pubblicato |
+| 3 · Evento e obiettivi con mappa | C1-16…18, C1-21…30 | Fatto |
+| 4 · Motore di gioco (M4) | C1-33…36, calcolo automatico del malus all'esfiltrazione (C1-18) | Da fare |
+| 5 · Collegamento AI (MCP) | C1-37 | Da fare |
+
+Note sulla fase 3:
+- Il malus per minuto (C1-18) è la regola `esfiltrazione.ritardo_minuti` della tabella punteggi dell'evento: il campo dell'evento la modifica. Il calcolo al momento dell'esfiltrazione arriva col motore di gioco.
+- Obiettivi che «compaiono dopo» (C1-26): salvati e congelati con l'evento; nascondere l'obiettivo alla squadra in campo arriva col motore di gioco.
+- Nomi dei raggi (D4): «area di esecuzione» e «zona obiettivo», come nel regolamento (tipo A, art. 5.2).

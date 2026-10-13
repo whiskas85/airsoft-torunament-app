@@ -112,6 +112,8 @@ function ModuloDati({
         setSporco(false);
         ctx.segna(id, false);
         if (svuotaSeOk) f.reset();
+        // un file già caricato non va ricaricato al salvataggio successivo
+        f.querySelectorAll<HTMLInputElement>('input[type=file]').forEach((i) => { i.value = ''; });
       }
       return r;
     });

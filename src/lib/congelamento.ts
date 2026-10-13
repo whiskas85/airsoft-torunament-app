@@ -52,7 +52,7 @@ export async function costruisciConfigurazione(eventoId: string) {
     obiettivi: ev.obiettivi.map((o) => ({
       id: o.id, codice: o.codice, nome: o.nome, tipi: o.tipi, lat: o.lat, lon: o.lon, geometria: o.geometria,
       durataMin: o.durataMin, areaDa: o.areaDa, areaA: o.areaA, ultimaFinestra: o.ultimaFinestra, ordine: o.ordine,
-      fasi: o.fasi, versioneTemplateId: o.versioneTemplateId,
+      fasi: o.fasi, versioneTemplateId: o.versioneTemplateId, dipendeDa: o.dipendeDa,
       arbitri: o.arbitri.map((a) => a.arbitroEventoId),
     })),
     squadre: ev.squadre.map((s) => ({
