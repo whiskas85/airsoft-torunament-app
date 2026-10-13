@@ -38,7 +38,8 @@ export async function controlliEvento(eventoId: string) {
   const accettati = new Set(ev.arbitri.filter((a) => a.stato === 'ACCETTATA').map((a) => a.id));
   const senzaArbitro = conArbitro.filter((o) => !o.arbitri.some((a) => accettati.has(a.arbitroEventoId)));
   const fuoriNumero = gareggianti.filter((s) => s._count.partecipanti < par.operatori.min || s._count.partecipanti > par.operatori.max);
-  const senzaPunti = ev.obiettivi.filter((o) => {
+  // i punti si chiedono agli obiettivi con arbitro; waypoint e ricognizioni valgono per le regole generali (es. +50 ciascuno)
+  const senzaPunti = conArbitro.filter((o) => {
     const p = puntiObj[o.codice];
     if (p?.valorePositivo == null) return true;
     return (o.fasi as Fase[]).some((f) => p.fasi?.[f.codice] == null);
@@ -64,7 +65,7 @@ export async function controlliEvento(eventoId: string) {
     {
       messaggio: senzaPunti.length
         ? `Tabella punteggi incompleta: ${senzaPunti.map((o) => o.codice).join(', ')}`
-        : 'Tabella punteggi completa (valore di ogni obiettivo e di ogni fase)',
+        : 'Tabella punteggi completa (valore di ogni obiettivo con arbitro e di ogni fase)',
       ok: senzaPunti.length === 0, bloccante: true, dove: 'obiettivi',
     },
     { messaggio: 'Iscrizioni pagate', ok: gareggianti.every((s) => s.pagato), bloccante: false, dove: 'squadre' },

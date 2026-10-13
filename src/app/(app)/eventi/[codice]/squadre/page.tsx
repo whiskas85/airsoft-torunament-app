@@ -4,6 +4,7 @@ import { contestoEvento } from '@/lib/contesto';
 import { FormAzione } from '@/components/FormAzione';
 import { Presenze } from '@/components/Presenze';
 import { impostaSquadraEvento, iscriviSquadra } from '@/actions/iscrizioni';
+import { prossimoIdentificativo } from '@/lib/squadre';
 
 const NOME_RUOLO = { GAREGGIA: 'In gara', ORGANIZZATRICE: 'Organizzatrice', AIUTO: 'In aiuto' } as const;
 
@@ -15,8 +16,9 @@ export default async function Squadre({ params }: { params: Promise<{ codice: st
   const iscritte = await prisma.squadraEvento.findMany({
     where: { eventoId: ev.id },
     include: { squadra: true, _count: { select: { partecipanti: true } } },
-    orderBy: { identificativo: 'asc' },
+    orderBy: { iscrittaIl: 'asc' },
   });
+  const proposto = await prossimoIdentificativo(ev.id);
 
   // ─── vista del membro di squadra
   if (!gestore) {
@@ -37,8 +39,14 @@ export default async function Squadre({ params }: { params: Promise<{ codice: st
                 <Presenze squadraEventoId={se.id} modificabile={modificabile} operatori={parametri.operatori} />
               ) : iscrivibile ? (
                 <FormAzione azione={iscriviSquadra} nascosti={{ eventoId: ev.id, squadraId: s.id }} etichetta="Iscrivi la squadra">
-                  <label className="etichetta">Identificativo della pattuglia</label>
-                  <input name="identificativo" defaultValue={s.sigla ?? ''} className="campo w-40 font-mono uppercase" />
+                  {proposto ? (
+                    <p className="text-sm">La pattuglia si chiamerà <b className="font-mono">{proposto}</b>.</p>
+                  ) : (
+                    <>
+                      <label className="etichetta">Identificativo della pattuglia</label>
+                      <input name="identificativo" defaultValue={s.sigla ?? ''} className="campo w-40 font-mono uppercase" />
+                    </>
+                  )}
                 </FormAzione>
               ) : (
                 <p className="text-sm text-tenue">Le iscrizioni non sono aperte per questa squadra.</p>
@@ -101,14 +109,14 @@ export default async function Squadre({ params }: { params: Promise<{ codice: st
       {modificabile && altre.length > 0 && (
         <section className="carta">
           <h2 className="mb-3 text-lg font-semibold">Iscrivi una squadra</h2>
-          <IscriviDaGestione eventoId={ev.id} squadre={altre} />
+          <IscriviDaGestione eventoId={ev.id} squadre={altre} proposto={proposto} />
         </section>
       )}
     </div>
   );
 }
 
-function IscriviDaGestione({ eventoId, squadre }: { eventoId: string; squadre: { id: string; nome: string; sigla: string | null }[] }) {
+function IscriviDaGestione({ eventoId, squadre, proposto }: { eventoId: string; squadre: { id: string; nome: string; sigla: string | null }[]; proposto: string | null }) {
   return (
     <FormAzione azione={iscriviSquadra} nascosti={{ eventoId }} etichetta="Iscrivi" classe="grid items-end gap-3 sm:grid-cols-[1fr_10rem_auto]">
       <div>
@@ -119,7 +127,7 @@ function IscriviDaGestione({ eventoId, squadre }: { eventoId: string; squadre: {
       </div>
       <div>
         <label className="etichetta">Identificativo</label>
-        <input name="identificativo" className="campo font-mono uppercase" placeholder="sigla" />
+        <input name="identificativo" key={proposto} defaultValue={proposto ?? ''} className="campo font-mono uppercase" placeholder="sigla" />
       </div>
     </FormAzione>
   );

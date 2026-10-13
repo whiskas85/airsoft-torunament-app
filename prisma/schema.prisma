@@ -98,6 +98,7 @@ model Utente {
   dispositivi Dispositivo[]
   ruoli       RuoloEnte[]
   direzione   MembroDirezione[]
+  capoObiettivi Obiettivo[] @relation("CapoObiettivo")
 }
 
 /// Ogni telefono ha la sua coppia di chiavi: la privata non lascia mai il telefono.
@@ -405,6 +406,10 @@ model Evento {
   luogo      String?
   lat        Float?
   lon        Float?
+  /// parcheggi per le squadre: [{ nome, descrizione, lat, lon }] (C1-17)
+  parcheggi  Json        @default("[]")
+  /// identificativo delle pattuglie: «PREBE» → PREBE 1, PREBE 2… (C1-30)
+  prefissoSquadre String?
   versioneTipologiaId String
   versioneTipologia   VersioneTipologia @relation(fields: [versioneTipologiaId], references: [id])
   stato      StatoEvento @default(BOZZA)
@@ -487,6 +492,11 @@ model Obiettivo {
   ordine      Int?
   /// fasi E: [{ codice: "E1", nome: "Disinnesca la bomba" }]
   fasi        Json     @default("[]")
+  /// compare alla squadra solo dopo l'esito positivo di TUTTI questi obiettivi (id) (C1-26)
+  dipendeDa   String[] @default([])
+  /// capo obiettivo, nominato dall'organizzazione (C1-14)
+  capoUtenteId String?
+  capo        Utente?  @relation("CapoObiettivo", fields: [capoUtenteId], references: [id])
   versioneTemplateId String?
   versioneTemplate   VersioneTemplate? @relation(fields: [versioneTemplateId], references: [id])
   stato       StatoObiettivo @default(ATTIVO)

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { prossimoIdentificativo } from '@/lib/squadre';
 import { prisma } from '@/lib/db';
 import { richiediUtente, type UtenteCorrente } from '@/lib/auth';
 import { ErroreRegola, STATI_MODIFICABILI, puoGestire } from '@/lib/permessi';
@@ -36,7 +37,10 @@ export async function iscriviSquadra(_p: StatoForm, fd: FormData): Promise<Stato
     if (await prisma.squadraEvento.findUnique({ where: { eventoId_squadraId: { eventoId: ev.id, squadraId } } })) {
       throw new ErroreRegola('Squadra già iscritta.');
     }
-    const identificativo = (testo(fd, 'identificativo') || squadra.sigla || squadra.nome.slice(0, 3)).toUpperCase();
+    // con la sigla dell'evento l'identificativo lo assegna l'app (PREBE 1, PREBE 2…); chi gestisce può cambiarlo
+    const proposto = await prossimoIdentificativo(ev.id);
+    const scritto = gestore ? testo(fd, 'identificativo') : '';
+    const identificativo = (scritto || proposto || testo(fd, 'identificativo') || squadra.sigla || squadra.nome.slice(0, 3)).toUpperCase();
     if (await prisma.squadraEvento.findUnique({ where: { eventoId_identificativo: { eventoId: ev.id, identificativo } } })) {
       throw new ErroreRegola(`L’identificativo ${identificativo} è già usato da un’altra squadra: scegline un altro.`);
     }

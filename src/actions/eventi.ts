@@ -6,9 +6,11 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { richiediUtente } from '@/lib/auth';
 import { controllaCoordinamenti, ErroreRegola, eventoModificabile, organizzatore, puoGestire } from '@/lib/permessi';
-import { esegui, testo, testoOpz, intero, dataOra, tutti, type StatoForm } from '@/lib/form';
+import { esegui, testo, testoOpz, intero, decimale, dataOra, tutti, type StatoForm } from '@/lib/form';
 import { controlliEvento, puoPassare } from '@/lib/controlli';
 import { costruisciConfigurazione } from '@/lib/congelamento';
+import { salvaFile } from '@/lib/storage';
+import { CAMPO_RITARDO, type RegolaPunti } from '@/lib/punteggi';
 
 type Parametri = { finestra: { modalita: string }; esfiltrazione: { orarioMassimo: boolean } };
 
@@ -21,6 +23,52 @@ function opzioniDaForm(fd: FormData, par: Parametri) {
     periodoContestazioniOre: Math.max(0, intero(fd, 'periodoContestazioniOre') ?? 24),
     esfiltrazioneMassima: par.esfiltrazione.orarioMassimo && esf ? esf.toISOString() : null,
   };
+}
+
+/** Campo di gara e parcheggi dalla mappa (C1-16, C1-17). */
+function datiLuogo(fd: FormData) {
+  let parcheggi: { nome: string; descrizione: string; lat: number; lon: number }[] = [];
+  try {
+    const grezzi = JSON.parse(testo(fd, 'parcheggi') || '[]') as Record<string, unknown>[];
+    parcheggi = grezzi
+      .filter((p) => Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lon)))
+      .map((p, i) => ({ nome: String(p.nome ?? '').trim() || `Parcheggio ${i + 1}`, descrizione: String(p.descrizione ?? '').trim(), lat: Number(p.lat), lon: Number(p.lon) }));
+  } catch {
+    throw new ErroreRegola('Parcheggi non leggibili: riprova a posizionarli sulla mappa.');
+  }
+  const prefisso = testo(fd, 'prefissoSquadre').toUpperCase().replace(/\s+/g, '');
+  return { lat: decimale(fd, 'lat'), lon: decimale(fd, 'lon'), parcheggi, prefissoSquadre: prefisso || null };
+}
+
+/** Locandina caricata come immagine (C1-21): diventa un documento dell'evento, servito dalla sua rotta. */
+async function salvaLocandina(fd: FormData, ev: { id: string; enteId: string }) {
+  const file = fd.get('locandina');
+  if (!(file instanceof File) || file.size === 0) return null;
+  if (!file.type.startsWith('image/')) throw new ErroreRegola('La locandina deve essere un’immagine (JPG, PNG…).');
+  if (file.size > 15 * 1024 * 1024) throw new ErroreRegola('Locandina troppo grande (massimo 15 MB).');
+  const estensione = file.name.includes('.') ? file.name.split('.').pop()! : 'jpg';
+  const { hash, file: percorso } = await salvaFile(Buffer.from(await file.arrayBuffer()), estensione);
+  const doc = await prisma.documento.create({
+    data: { enteId: ev.enteId, titolo: 'Locandina', tipo: 'ALTRO', file: percorso, mime: file.type, byte: file.size, hash },
+  });
+  await prisma.eventoDocumento.create({ data: { eventoId: ev.id, documentoId: doc.id, ruolo: 'ALTRO' } });
+  return `/api/documenti/${doc.id}`;
+}
+
+/** `vuotoTiene`: alla creazione un campo vuoto lascia il valore della tipologia (es. FIGT −50). */
+async function salvaPenalitaRitardo(eventoId: string, fd: FormData, vuotoTiene = false) {
+  if (fd.get('penalitaRitardo') === null) return;
+  const valore = intero(fd, 'penalitaRitardo');
+  if (valore == null && vuotoTiene) return;
+  if (valore != null && valore < 0) throw new ErroreRegola('Il malus per minuto si scrive positivo: −10 punti al minuto si scrive 10.');
+  const t = await prisma.tabellaPunteggi.findUnique({ where: { eventoId } });
+  if (!t) return;
+  const tab = t.regole as { regole?: RegolaPunti[] } & Record<string, unknown>;
+  const altre = (tab.regole ?? []).filter((x) => x.campo !== CAMPO_RITARDO);
+  const prima = (tab.regole ?? []).find((x) => x.campo === CAMPO_RITARDO);
+  if ((prima ? Math.abs(prima.punti) : null) === valore) return;
+  const regole = valore ? [...altre, { campo: CAMPO_RITARDO, tipo: 'per_unita', punti: -valore, nota: prima?.nota ?? 'Ritardo all’esfiltrazione' }] : altre;
+  await prisma.tabellaPunteggi.update({ where: { eventoId }, data: { regole: { ...tab, regole }, versione: { increment: 1 } } });
 }
 
 /** Codice breve leggibile e univoco, es. PLR-1510-K7Q */
@@ -60,9 +108,9 @@ export async function creaEvento(_p: StatoForm, fd: FormData): Promise<StatoForm
       campionatoId = c.id;
     }
     codice = await nuovoCodice(versione.tipologia.codice, inizio);
-    await prisma.evento.create({
+    const creato = await prisma.evento.create({
       data: {
-        codice, nome, enteId, inizio, fine, luogo: testoOpz(fd, 'luogo'), versioneTipologiaId: versione.id,
+        codice, nome, enteId, inizio, fine, luogo: testoOpz(fd, 'luogo'), versioneTipologiaId: versione.id, ...datiLuogo(fd),
         opzioni: opzioniDaForm(fd, versione.parametri as Parametri),
         coordinamenti: { create: coordinamenti.map((coordinamentoId) => ({ coordinamentoId })) },
         // il numero di tappa non si salva: è l'ordine delle date nel campionato (C1-20)
@@ -71,6 +119,9 @@ export async function creaEvento(_p: StatoForm, fd: FormData): Promise<StatoForm
         tabella: { create: { regole: { ...(versione.regolePredefinite as object), obiettivi: {} } } },
       },
     });
+    await salvaPenalitaRitardo(creato.id, fd, true);
+    const locandina = await salvaLocandina(fd, creato);
+    if (locandina) await prisma.evento.update({ where: { id: creato.id }, data: { locandinaUrl: locandina } });
   });
   if (r.errore) return r;
   redirect(`/eventi/${codice}`);
@@ -88,10 +139,13 @@ export async function aggiornaEvento(_p: StatoForm, fd: FormData): Promise<Stato
     await prisma.evento.update({
       where: { id: ev.id },
       data: {
-        nome, inizio, fine, luogo: testoOpz(fd, 'luogo'), locandinaUrl: testoOpz(fd, 'locandinaUrl'),
+        nome, inizio, fine, luogo: testoOpz(fd, 'luogo'), ...datiLuogo(fd),
         opzioni: opzioniDaForm(fd, ev.versioneTipologia.parametri as Parametri),
       },
     });
+    await salvaPenalitaRitardo(ev.id, fd);
+    const locandina = await salvaLocandina(fd, ev);
+    if (locandina) await prisma.evento.update({ where: { id: ev.id }, data: { locandinaUrl: locandina } });
     revalidatePath(`/eventi/${ev.codice}`);
     return { ok: 'Dati dell’evento salvati.' };
   });

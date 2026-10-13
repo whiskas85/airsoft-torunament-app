@@ -7,6 +7,8 @@ import { FormAzione } from '@/components/FormAzione';
 import { CampiEvento } from '@/components/CampiEvento';
 import { aggiornaEvento, annullaAvvioProva, avviaEvento, pubblicaEvento, riportaInBozza } from '@/actions/eventi';
 import { debugLoginAttivo } from '@/lib/prova';
+import { penalitaRitardo } from '@/lib/punteggi';
+import type { Parcheggio } from '@/components/mappa/MappaEvento';
 
 export default async function Panoramica({ params }: { params: Promise<{ codice: string }> }) {
   const { codice } = await params;
@@ -58,7 +60,7 @@ export default async function Panoramica({ params }: { params: Promise<{ codice:
         <section className="carta">
           <h2 className="mb-3 text-lg font-semibold">Dati dell’evento</h2>
           <FormAzione azione={aggiornaEvento} nascosti={nascosti} dati>
-            <CampiEvento valori={{ ...ev, opzioni: ev.opzioni as object }} parametri={parametri} />
+            <CampiEvento valori={{ ...ev, opzioni: ev.opzioni as object, parcheggi: ev.parcheggi as Parcheggio[] }} parametri={parametri} penalitaRitardo={await penalitaRitardo(ev.id)} />
           </FormAzione>
         </section>
       )}
